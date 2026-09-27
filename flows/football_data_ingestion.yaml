@@ -1,0 +1,87 @@
+id: football_data_ingestion
+namespace: football
+inputs:
+  - id: endpoint
+    type: SELECT
+    required: true
+    defaults: "fixtures"
+    values:
+      - fixtures
+      - fixtures_events
+      - fixtures_head_to_head
+      - fixtures_lineups
+      - fixtures_players
+      - fixtures_rounds
+      - fixtures_statistics
+      - injuries
+      - players_profiles
+      - players_seasons
+      - players_squads
+      - players_statistics
+      - players_teams
+      - players_top_assists
+      - players_top_redcards
+      - players_top_scorers
+      - players_top_yellowcards
+      - standings
+      - teams
+      - teams_seasons
+      - teams_statistics
+      - transfers
+    description: "Select the API endpoint to ingest data from."
+
+  - id: league
+    type: INT
+    required: true
+    defaults: 39
+
+  - id: season
+    type: INT
+    required: true
+    defaults: 2024
+
+  - id: team
+    type: INT
+    required: false
+
+  - id: h2h
+    type: STRING
+    required: false
+
+  - id: fixture
+    type: INT
+    required: false
+
+  - id: player
+    type: INT
+    required: false
+
+  - id: logical_date
+    type: STRING
+    required: false
+
+tasks:
+  - id: run_ingest
+    type: io.kestra.plugin.scripts.shell.Commands
+    taskRunner:
+      type: io.kestra.plugin.scripts.runner.docker.Docker
+      image: football-ingest:latest
+      pullPolicy: NEVER
+    env:
+      AWS_ACCESS_KEY_ID: "{{ envs.aws_access_key_id }}"
+      AWS_SECRET_ACCESS_KEY: "{{ envs.aws_secret_access_key }}"
+      AWS_DEFAULT_REGION: "{{ envs.aws_default_region }}"
+      AWS_S3_LANDING_BUCKET_NAME: "{{ envs.aws_s3_landing_bucket_name }}"
+      API_FOOTBALL_KEY: "{{ envs.api_football_key }}"
+      UV_NO_CACHE: "1"
+      INGEST_ENDPOINT: "{{ inputs.endpoint }}"
+      INGEST_LEAGUE: "{{ inputs.league }}"
+      INGEST_SEASON: "{{ inputs.season }}"
+      INGEST_TEAM: "{{ inputs.team }}"
+      INGEST_H2H: "{{ inputs.h2h }}"
+      INGEST_FIXTURE: "{{ inputs.fixture }}"
+      INGEST_PLAYER: "{{ inputs.player }}"
+      INGEST_LOGICAL_DATE: "{{ inputs.logical_date ?? execution.startDate | date('yyyy-MM-dd') }}"
+    commands:
+      - cd /app
+      - /app/.venv/bin/python src/ingest.py
