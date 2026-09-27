@@ -1,4 +1,5 @@
 import logging
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -8,7 +9,9 @@ from utils import build_s3_key, fetch_data, load_config, upload_to_s3
 
 # Configure the root logger for the entire project
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - [%(name)s] - %(levelname)s - %(message)s"
+    level=logging.INFO,
+    stream=sys.stdout,
+    format="%(asctime)s - [%(name)s] - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
@@ -45,48 +48,56 @@ logger = logging.getLogger(__name__)
     ),
     default="fixtures",
     required=True,
+    envvar="INGEST_ENDPOINT",
     help="Choose the API endpoint to ingest data from. Options: fixtures, teams, players, transfers.",
 )
 @click.option(
     "--league",
     default=39,  # Default to English Premier League
     type=int,
+    envvar="INGEST_LEAGUE",
     help="Specify the league ID for which to ingest data. Default is 39 (English Premier League).",
 )
 @click.option(
     "--season",
     default=2024,
     type=int,
+    envvar="INGEST_SEASON",
     help="Specify the season year (format YYYY) for which to ingest data. Default is 2024.",
 )
 @click.option(
     "--team",
     default=None,
     type=int,
+    envvar="INGEST_TEAM",
     help="Specify the team ID to filter data for a specific team.",
 )
 @click.option(
     "--h2h",
     default=None,
     type=str,
+    envvar="INGEST_H2H",
     help="Specify the head-to-head team IDs (hyphen-separated) to filter data for specific matchups.",
 )
 @click.option(
     "--fixture",
     default=None,
     type=int,
+    envvar="INGEST_FIXTURE",
     help="Specify the fixture ID to filter data for a specific match.",
 )
 @click.option(
     "--player",
     default=None,
     type=int,
+    envvar="INGEST_PLAYER",
     help="Specify the player ID to filter data for a specific player.",
 )
 @click.option(
     "--logical_date",
     default=datetime.now(UTC).strftime("%Y-%m-%d"),
     type=str,
+    envvar="INGEST_LOGICAL_DATE",
     help="Specify the logical date for the data ingestion process. Default is the current UTC date.",
 )
 def ingest_data(

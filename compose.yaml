@@ -1,14 +1,14 @@
 services:
-  ingest:
-    build: .
-    image: football-ingest:latest
-    container_name: football-ingest
-    # Uncomment the 'user' and 'volumes' directives below if you need to 
-    # write files (e.g., application logs) directly to the host machine later.
-    # user: "${UID:-1000}:${GID:-1000}"
-    # volumes:
-    #   - ./data/raw:/app/data/raw
-    env_file: .env
+  # ingest:
+  #   build: .
+  #   image: football-ingest:latest
+  #   container_name: football-ingest
+  #   # Uncomment the 'user' and 'volumes' directives below if you need to 
+  #   # write files (e.g., application logs) directly to the host machine later.
+  #   # user: "${UID:-1000}:${GID:-1000}"
+  #   # volumes:
+  #   #   - ./data/raw:/app/data/raw
+  #   env_file: .env
 
   kestra_db:
     image: postgres:18
@@ -31,6 +31,8 @@ services:
       - "8080:8080"
     env_file: .env
     environment:
+      KESTRA_VARIABLES_ENV_VARS_ENABLED: "true"
+      KESTRA_VARIABLES_ENV_VARS_PREFIX: ""
       KESTRA_CONFIGURATION: |
         kestra:
           server:
