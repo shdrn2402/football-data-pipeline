@@ -51,6 +51,7 @@ data "aws_iam_policy_document" "data_loader_policy" {
     effect = "Allow"
     actions = [
       "s3:PutObject",
+      "s3:GetObject",
       "s3:AbortMultipartUpload"
     ]
     resources = ["${aws_s3_bucket.data_landing_zone.arn}/*"]
