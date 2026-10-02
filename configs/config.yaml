@@ -1,115 +1,121 @@
 api:
   base_url: "https://v3.football.api-sports.io"
   endpoints:
+    # Dimensions (Bootstrap)
+    leagues:
+      path: "/leagues"
+      allowed_params: ["id"]
+      s3_template: "raw/dimensions/leagues/league_id={id}"
+
     teams:
       path: "/teams"
-      required_params: ["league", "season"]
-      s3_template: "raw/teams/league_id={league}/season={season}/ingest_date={ingest_date}"
+      allowed_params: ["league", "season"]
+      s3_template: "raw/dimensions/teams/league_id={league}/season={season}"
 
-    teams_statistics:
-      path: "/teams/statistics"
-      required_params: ["league", "season", "team"]
-      s3_template: "raw/teams_statistics/league_id={league}/season={season}/team_id={team}/ingest_date={ingest_date}"
+    # teams_statistics:
+    #   path: "/teams/statistics"
+    #   allowed_params: ["league", "season", "team"]
+    #   s3_template: "raw/teams_statistics/league_id={league}/season={season}/team_id={team}/target_date={target_date}"
 
-    teams_seasons:
-      path: "/teams/seasons"
-      required_params: ["team"]
-      s3_template: "raw/teams_seasons/team_id={team}/ingest_date={ingest_date}"
+    # teams_seasons:
+    #   path: "/teams/seasons"
+    #   allowed_params: ["team"]
+    #   s3_template: "raw/teams_seasons/team_id={team}/target_date={target_date}"
 
-    standings:
-      path: "/standings"
-      required_params: ["league", "season"]
-      s3_template: "raw/standings/league_id={league}/season={season}/ingest_date={ingest_date}"
+    # standings:
+    #   path: "/standings"
+    #   allowed_params: ["league", "season", "team"]
+    #   s3_template: "raw/standings/league_id={league}/season={season}/target_date={target_date}"
 
-    fixtures:
-      path: "/fixtures"
-      required_params: ["league", "season"]
-      s3_template: "raw/fixtures/league_id={league}/season={season}/ingest_date={ingest_date}"
+    # fixtures:
+    #   path: "/fixtures"
+    #   allowed_params: ["league", "season", "team"]
+    #   s3_template: "raw/fixtures/league_id={league}/season={season}/target_date={target_date}"
 
-    fixtures_rounds:
-      path: "/fixtures/rounds"
-      required_params: ["league", "season"]
-      s3_template: "raw/fixtures_rounds/league_id={league}/season={season}/ingest_date={ingest_date}"
+    # fixtures_rounds:
+    #   path: "/fixtures/rounds"
+    #   allowed_params: ["league", "season"]
+    #   s3_template: "raw/fixtures_rounds/league_id={league}/season={season}/target_date={target_date}"
 
-    fixtures_head_to_head:
-      path: "/fixtures/headtohead"
-      required_params: ["h2h"]
-      s3_template: "raw/fixtures_head_to_head/h2h={h2h}/ingest_date={ingest_date}"
+    # fixtures_head_to_head:
+    #   path: "/fixtures/headtohead"
+    #   allowed_params: ["h2h", "league", "season"]
+    #   s3_template: "raw/fixtures_head_to_head/h2h={h2h}/target_date={target_date}"
 
-    fixtures_statistics:
-      path: "/fixtures/statistics"
-      required_params: ["fixture"]
-      s3_template: "raw/fixtures_statistics/fixture_id={fixture}/ingest_date={ingest_date}"
+    # fixtures_statistics:
+    #   path: "/fixtures/statistics"
+    #   allowed_params: ["fixture", "team"]
+    #   s3_template: "raw/fixtures_statistics/fixture_id={fixture}/target_date={target_date}"
 
-    fixtures_events:
-      path: "/fixtures/events"
-      required_params: ["fixture"]
-      s3_template: "raw/fixtures_events/fixture_id={fixture}/ingest_date={ingest_date}"
+    # fixtures_events:
+    #   path: "/fixtures/events"
+    #   allowed_params: ["fixture", "team", "player"]
+    #   s3_template: "raw/fixtures_events/fixture_id={fixture}/target_date={target_date}"
 
-    fixtures_lineups:
-      path: "/fixtures/lineups"
-      required_params: ["fixture"]
-      s3_template: "raw/fixtures_lineups/fixture_id={fixture}/ingest_date={ingest_date}"
+    # fixtures_lineups:
+    #   path: "/fixtures/lineups"
+    #   allowed_params: ["fixture", "team", "player"]
+    #   s3_template: "raw/fixtures_lineups/fixture_id={fixture}/target_date={target_date}"
 
-    fixtures_players:
-      path: "/fixtures/players"
-      required_params: ["fixture"]
-      s3_template: "raw/fixtures_players/fixture_id={fixture}/ingest_date={ingest_date}"
+    # fixtures_players:
+    #   path: "/fixtures/players"
+    #   allowed_params: ["fixture", "team"]
+    #   s3_template: "raw/fixtures_players/fixture_id={fixture}/target_date={target_date}"
 
-    players_seasons:
-      path: "/players/seasons"
-      required_params: []
-      s3_template: "raw/players_seasons/ingest_date={ingest_date}"
+    # players_seasons:
+    #   path: "/players/seasons"
+    #   allowed_params: ["player"]
+    #   s3_template: "raw/players_seasons/target_date={target_date}"
 
-    players_profiles:
-      path: "/players/profiles"
-      required_params: ["player"]
-      s3_template: "raw/players_profiles/player_id={player}/ingest_date={ingest_date}"
+    # players_profiles:
+    #   path: "/players/profiles"
+    #   allowed_params: ["player"]
+    #   s3_template: "raw/players_profiles/player_id={player}/target_date={target_date}"
 
-    players_statistics:
-      path: "/players"
-      required_params: ["league", "season"]
-      s3_template: "raw/players_statistics/league_id={league}/season={season}/ingest_date={ingest_date}"
+    # players_statistics:
+    #   path: "/players"
+    #   allowed_params: ["league", "season", "team"]
+    #   s3_template: "raw/players_statistics/league_id={league}/season={season}/target_date={target_date}"
 
-    players_teams:
-      path: "/players/teams"
-      required_params: ["player"]
-      s3_template: "raw/players_teams/player_id={player}/ingest_date={ingest_date}"
+    # players_teams:
+    #   path: "/players/teams"
+    #   allowed_params: ["player"]
+    #   s3_template: "raw/players_teams/player_id={player}/target_date={target_date}"
 
-    players_squads:
-      path: "/players/squads"
-      required_params: ["team"]
-      s3_template: "raw/players_squads/team_id={team}/ingest_date={ingest_date}"
+    # players_squads:
+    #   path: "/players/squads"
+    #   allowed_params: ["team", "player"]
+    #   s3_template: "raw/players_squads/team_id={team}/target_date={target_date}"
 
-    players_top_scorers:
-      path: "/players/topscorers"
-      required_params: ["league", "season"]
-      s3_template: "raw/players_top_scorers/league_id={league}/season={season}/ingest_date={ingest_date}"
+    # players_top_scorers:
+    #   path: "/players/topscorers"
+    #   allowed_params: ["league", "season"]
+    #   s3_template: "raw/players_top_scorers/league_id={league}/season={season}/target_date={target_date}"
 
-    players_top_assists:
-      path: "/players/topassists"
-      required_params: ["league", "season"]
-      s3_template: "raw/players_top_assists/league_id={league}/season={season}/ingest_date={ingest_date}"
+    # players_top_assists:
+    #   path: "/players/topassists"
+    #   allowed_params: ["league", "season"]
+    #   s3_template: "raw/players_top_assists/league_id={league}/season={season}/target_date={target_date}"
 
-    players_top_yellowcards:
-      path: "/players/topyellowcards"
-      required_params: ["league", "season"]
-      s3_template: "raw/players_top_yellowcards/league_id={league}/season={season}/ingest_date={ingest_date}"
+    # players_top_yellowcards:
+    #   path: "/players/topyellowcards"
+    #   allowed_params: ["league", "season"]
+    #   s3_template: "raw/players_top_yellowcards/league_id={league}/season={season}/target_date={target_date}"
 
-    players_top_redcards:
-      path: "/players/topredcards"
-      required_params: ["league", "season"]
-      s3_template: "raw/players_top_redcards/league_id={league}/season={season}/ingest_date={ingest_date}"
+    # players_top_redcards:
+    #   path: "/players/topredcards"
+    #   allowed_params: ["league", "season"]
+    #   s3_template: "raw/players_top_redcards/league_id={league}/season={season}/target_date={target_date}"
 
-    injuries:
-      path: "/injuries"
-      required_params: ["league", "season"]
-      s3_template: "raw/injuries/league_id={league}/season={season}/ingest_date={ingest_date}"
+    # injuries:
+    #   path: "/injuries"
+    #   allowed_params: ["league", "season", "fixture", "team", "player"]
+    #   s3_template: "raw/injuries/league_id={league}/season={season}/target_date={target_date}"
 
-    transfers:
-      path: "/transfers"
-      required_params: ["team"]
-      s3_template: "raw/transfers/team_id={team}/ingest_date={ingest_date}"
+    # transfers:
+    #   path: "/transfers"
+    #   allowed_params: ["team", "player"]
+    #   s3_template: "raw/transfers/team_id={team}/target_date={target_date}"
 
   headers:
     key_name: "x-apisports-key"

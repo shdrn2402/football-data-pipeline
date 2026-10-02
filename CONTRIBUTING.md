@@ -1,4 +1,4 @@
-# Git Commit Convention for AI Agents
+## 1. Git Commit Convention for AI Agents
 
 **Target Audience:** All AI Coding Agents and Human Developers working on this repository.
 
@@ -31,3 +31,38 @@
 * `feat(terraform): configure aws s3 bucket and iam user`
 * `fix(api): correct json parsing logic for teams endpoint`
 * `docs: update TODO with databricks transformation task [skip ci]`
+
+## 2. Issue Convention
+
+* **Language:** English.
+* **Title Format:** `<Type>: <Description>`
+  * Prefix and description MUST start with a capital letter (Capital Case / Title Case)[cite: 4].
+  * Common types: `Feature:`, `Fix:`, `Chore:`[cite: 4].
+  * *Example:* `Feature: Implement Parent Orchestration Flow for Automated Data Ingestion`[cite: 4]
+* **Body Requirements:**
+  * Context / Description.
+  * Task checklist (`- [ ]`).
+  * Acceptance Criteria / Definition of Done (`- [ ]`).
+
+---
+
+## 3. Pull Request (PR) Convention
+
+* **Language:** English.
+* **Title Format:** `<Type>(<scope>): <Description>`
+  * The type prefix and the description after the colon MUST start with a capital letter[cite: 4].
+  * *Example:* `Feature(kestra): Implement data ingestion flow`[cite: 4]
+* **Body Requirements:**
+  * Must contain a brief summary of implemented changes.
+  * Must link and automatically close the target issue using closing keywords (e.g., `Closes #<issue-id>`).
+* **Lifecycle:** Merge via **Merge pull request** into `main`, then delete the remote feature branch.
+
+## 4. Branch Naming Convention
+
+All feature branches must start with a category prefix followed by a slash and a short descriptive name in **kebab-case**:
+
+* `feature/<short-description>` – for new capabilities, flows, or pipelines (e.g., `feature/kestra-ingestion-flow`, `feature/kestra-parent-orchestrator`).
+* `fix/<short-description>` – for bug fixes (e.g., `fix/rate-limit-retry`).
+* `chore/<short-description>` – for repo maintenance, CI/CD, or dependency upgrades.
+
+Rule: Always branch off the latest `main` branch.

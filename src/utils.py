@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import string
 import time
 from pathlib import Path
 
@@ -151,17 +152,24 @@ def fetch_data(
 
 
 def build_s3_key(template_string: str, **kwargs) -> str:
-    """Constructs an S3 key by formatting a template string with provided keyword arguments.
-
-    Args:
-        template_string (str): The S3 key template containing placeholders.
-        **kwargs: Key-value pairs to replace placeholders in the template.
-
-    Returns:
-        str: The formatted S3 key ready for use in S3 operations.
-    """
+    """Constructs an S3 key dynamically, appending extra parameters as folders."""
     try:
-        s3_key = template_string.format(**kwargs) + "/data.json"
+        template_keys = {
+            t[1] for t in string.Formatter().parse(template_string) if t[1] is not None
+        }
+
+        base_path = template_string.format(**kwargs)
+
+        extra_params = []
+        for key, value in kwargs.items():
+            if key not in template_keys and key != "target_date":
+                extra_params.append(f"{key}={value}")
+
+        if extra_params:
+            s3_key = f"{base_path}/{'/'.join(sorted(extra_params))}/data.json"
+        else:
+            s3_key = f"{base_path}/data.json"
+
     except KeyError as e:
         logger.error(f"Missing placeholder for S3 key construction: {e}")
         raise
@@ -172,11 +180,11 @@ def build_s3_key(template_string: str, **kwargs) -> str:
     return s3_key
 
 
-def upload_to_s3(raw_data: dict, bucket: str, s3_key: str) -> None:
+def upload_to_s3(data: str | dict, bucket: str, s3_key: str) -> None:
     """Uploads a dictionary as a JSON object to an AWS S3 bucket.
 
     Args:
-        raw_data (dict): The payload to serialize and upload.
+        data (str | dict): The payload to serialize and upload.
         bucket (str): The name of the target S3 bucket.
         s3_key (str): The destination key (path) in the S3 bucket.
 
@@ -185,9 +193,9 @@ def upload_to_s3(raw_data: dict, bucket: str, s3_key: str) -> None:
         TypeError: If the data object is not JSON serializable.
     """
     s3 = boto3.resource("s3")
-    raw_data_json = json.dumps(raw_data, ensure_ascii=False, indent=4)
+    body = json.dumps(data, ensure_ascii=False, indent=4)
     try:
-        s3.Bucket(bucket).put_object(Key=s3_key, Body=raw_data_json)
+        s3.Bucket(bucket).put_object(Key=s3_key, Body=body)
     except botocore.exceptions.ClientError as e:
         logger.error(
             f"Failed to upload data to S3 bucket '{bucket}' at '{s3_key}': {e}"

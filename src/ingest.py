@@ -4,7 +4,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import click
+from pydantic import ValidationError
 
+from schemas import DataEnvelope, Metadata
 from utils import build_s3_key, fetch_data, load_config, upload_to_s3
 
 # Configure the root logger for the entire project
@@ -29,6 +31,7 @@ logger = logging.getLogger(__name__)
             "fixtures_rounds",
             "fixtures_statistics",
             "injuries",
+            "leagues",
             "players_profiles",
             "players_seasons",
             "players_squads",
@@ -52,10 +55,10 @@ logger = logging.getLogger(__name__)
     help="Choose the API endpoint to ingest data from. Options: fixtures, teams, players, transfers.",
 )
 @click.option(
-    "--league",
+    "--league-id",
     default=39,  # Default to English Premier League
     type=int,
-    envvar="INGEST_LEAGUE",
+    envvar="INGEST_LEAGUE_ID",
     help="Specify the league ID for which to ingest data. Default is 39 (English Premier League).",
 )
 @click.option(
@@ -66,10 +69,10 @@ logger = logging.getLogger(__name__)
     help="Specify the season year (format YYYY) for which to ingest data. Default is 2024.",
 )
 @click.option(
-    "--team",
+    "--team-id",
     default=None,
     type=int,
-    envvar="INGEST_TEAM",
+    envvar="INGEST_TEAM_ID",
     help="Specify the team ID to filter data for a specific team.",
 )
 @click.option(
@@ -80,35 +83,35 @@ logger = logging.getLogger(__name__)
     help="Specify the head-to-head team IDs (hyphen-separated) to filter data for specific matchups.",
 )
 @click.option(
-    "--fixture",
+    "--fixture-id",
     default=None,
     type=int,
-    envvar="INGEST_FIXTURE",
+    envvar="INGEST_FIXTURE_ID",
     help="Specify the fixture ID to filter data for a specific match.",
 )
 @click.option(
-    "--player",
+    "--player-id",
     default=None,
     type=int,
-    envvar="INGEST_PLAYER",
+    envvar="INGEST_PLAYER_ID",
     help="Specify the player ID to filter data for a specific player.",
 )
 @click.option(
-    "--logical_date",
+    "--target-date",
     default=datetime.now(UTC).strftime("%Y-%m-%d"),
     type=str,
-    envvar="INGEST_LOGICAL_DATE",
+    envvar="INGEST_TARGET_DATE",
     help="Specify the logical date for the data ingestion process. Default is the current UTC date.",
 )
 def ingest_data(
     endpoint: str,
-    league: int,
-    logical_date: str,
+    league_id: int,
     season: int,
-    team: int | None,
+    team_id: int | None,
     h2h: str | None,
-    fixture: int | None,
-    player: int | None,
+    fixture_id: int | None,
+    player_id: int | None,
+    target_date: str | None,
 ) -> None:
 
     # Loading configuration and environment variables
@@ -136,17 +139,19 @@ def ingest_data(
     delay_seconds = config["api"]["limits"]["delay_seconds"]
 
     all_args = {
-        "league": league,
+        "id": league_id,
+        "league": league_id,
         "season": season,
-        "team": team,
+        "team": team_id,
         "h2h": h2h,
-        "fixture": fixture,
-        "player": player,
+        "fixture": fixture_id,
+        "player": player_id,
     }
     query_params = {}
-    for el in endpoint_config["required_params"]:
-        if all_args[el] is not None:
-            query_params[el] = all_args[el]
+    for el in endpoint_config["allowed_params"]:
+        val = all_args.get(el)
+        if val is not None:
+            query_params[el] = val
 
     raw_data = fetch_data(
         url=url,
@@ -157,15 +162,31 @@ def ingest_data(
     )
     logger.info(f"Data successfully fetched. Payload snippet: {str(raw_data)[:300]}...")
 
+    try:
+        envelope = DataEnvelope(
+            _metadata=Metadata(
+                endpoint=endpoint,
+                params=query_params,
+                target_date=target_date,
+            ),
+            payload=raw_data,
+        )
+        validated_dict = envelope.model_dump(by_alias=True, mode="json")
+    except ValidationError as e:
+        logger.error(f"Payload validation failed: {e}")
+        raise
+
+    validated_dict = envelope.model_dump(by_alias=True, mode="json")
+
     # Uploading the RAW data to S3
     bucket_name = config["aws_s3_landing_bucket"]
     s3_key = build_s3_key(
         template_string=endpoint_config["s3_template"],
-        ingest_date=logical_date,
+        target_date=target_date,
         **query_params,
     )
 
-    upload_to_s3(raw_data, bucket_name, s3_key)
+    upload_to_s3(validated_dict, bucket_name, s3_key)
     logger.info(
         f"Data successfully uploaded to S3 bucket '{bucket_name}' at '{s3_key}'."
     )

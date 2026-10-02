@@ -22,4 +22,4 @@ COPY --chown=ingest_user:ingest_group configs/ configs/
 
 COPY --chown=ingest_user:ingest_group src/ src/
 
-ENTRYPOINT ["python", "src/ingest.py"]
+# ENTRYPOINT ["python", "/app/src/ingest.py"]
