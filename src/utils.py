@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-import string
 import time
 from pathlib import Path
 
@@ -152,24 +151,10 @@ def fetch_data(
 
 
 def build_s3_key(template_string: str, **kwargs) -> str:
-    """Constructs an S3 key dynamically, appending extra parameters as folders."""
+    """Constructs an S3 key strictly based on the provided template string."""
     try:
-        template_keys = {
-            t[1] for t in string.Formatter().parse(template_string) if t[1] is not None
-        }
-
         base_path = template_string.format(**kwargs)
-
-        extra_params = []
-        for key, value in kwargs.items():
-            if key not in template_keys and key != "target_date":
-                extra_params.append(f"{key}={value}")
-
-        if extra_params:
-            s3_key = f"{base_path}/{'/'.join(sorted(extra_params))}/data.json"
-        else:
-            s3_key = f"{base_path}/data.json"
-
+        s3_key = f"{base_path}/data.json"
     except KeyError as e:
         logger.error(f"Missing placeholder for S3 key construction: {e}")
         raise

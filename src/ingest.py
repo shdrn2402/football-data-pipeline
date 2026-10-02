@@ -138,14 +138,23 @@ def ingest_data(
     )
     delay_seconds = config["api"]["limits"]["delay_seconds"]
 
+    target_entity_id = (
+        player_id
+        if endpoint in ("players", "players_statistics")
+        else team_id
+        if endpoint == "teams"
+        else league_id
+    )
+
     all_args = {
-        "id": league_id,
+        "date": target_date,
+        "fixture": fixture_id,
+        "h2h": h2h,
+        "id": target_entity_id,
         "league": league_id,
+        "player": player_id,
         "season": season,
         "team": team_id,
-        "h2h": h2h,
-        "fixture": fixture_id,
-        "player": player_id,
     }
     query_params = {}
     for el in endpoint_config["allowed_params"]:
@@ -183,7 +192,7 @@ def ingest_data(
     s3_key = build_s3_key(
         template_string=endpoint_config["s3_template"],
         target_date=target_date,
-        **query_params,
+        **all_args,
     )
 
     upload_to_s3(validated_dict, bucket_name, s3_key)
