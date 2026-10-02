@@ -7,11 +7,11 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "football-data-pipeline-terraform-state"
-    key            = "global/s3/terraform.tfstate"
-    region         = "eu-central-1"
-    dynamodb_table = "football-data-pipeline-terraform-state-locking"
-    encrypt        = true
+    bucket       = "football-data-pipeline-terraform-state"
+    key          = "global/s3/terraform.tfstate"
+    region       = "eu-central-1"
+    use_lockfile = true
+    encrypt      = true
   }
 }
 
