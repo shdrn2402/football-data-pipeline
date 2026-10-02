@@ -1,0 +1,62 @@
+id: football_bootstrap_dimensions
+namespace: football
+description: |
+  One-off/seasonal bootstrap flow for Dimension tables.
+  Extracts league metadata and teams/venues into raw Data Lake storage.
+
+inputs:
+  - id: league_id
+    type: INT
+    description: "API-Football league ID (e.g., 39 for Premier League)"
+    required: true
+
+  - id: season
+    type: INT
+    description: "Target season year"
+    required: true
+
+tasks:
+  - id: run_ingest_league_dimension
+    type: io.kestra.plugin.scripts.shell.Commands
+    description: "Extract league metadata"
+    taskRunner:
+      type: io.kestra.plugin.scripts.runner.docker.Docker
+      image: football-pipeline:latest
+      pullPolicy: IF_NOT_PRESENT
+    env:
+      AWS_ACCESS_KEY_ID: "{{ envs.aws_access_key_id }}"
+      AWS_SECRET_ACCESS_KEY: "{{ envs.aws_secret_access_key }}"
+      AWS_DEFAULT_REGION: "{{ envs.aws_default_region }}"
+      AWS_S3_LANDING_BUCKET_NAME: "{{ envs.aws_s3_landing_bucket_name }}"
+      API_FOOTBALL_KEY: "{{ envs.api_football_key }}"
+      UV_NO_CACHE: "1"
+      INGEST_LEAGUE_ID: "{{ inputs.league_id }}"
+      INGEST_SEASON: "{{ inputs.season }}"
+    commands:
+      - cd /app
+      - /app/.venv/bin/python src/ingest.py
+        --endpoint leagues
+        --league-id {{ inputs.league_id }}
+
+  - id: ingest_teams_dimension
+    type: io.kestra.plugin.scripts.shell.Commands
+    description: "Extract teams and venues metadata" 
+    taskRunner:
+      type: io.kestra.plugin.scripts.runner.docker.Docker
+      image: football-pipeline:latest
+      pullPolicy: IF_NOT_PRESENT
+    env:
+      AWS_ACCESS_KEY_ID: "{{ envs.aws_access_key_id }}"
+      AWS_SECRET_ACCESS_KEY: "{{ envs.aws_secret_access_key }}"
+      AWS_DEFAULT_REGION: "{{ envs.aws_default_region }}"
+      AWS_S3_LANDING_BUCKET_NAME: "{{ envs.aws_s3_landing_bucket_name }}"
+      API_FOOTBALL_KEY: "{{ envs.api_football_key }}"
+      UV_NO_CACHE: "1"
+      INGEST_LEAGUE_ID: "{{ inputs.league_id }}"
+      INGEST_SEASON: "{{ inputs.season }}"
+    commands:
+      - cd /app
+      - /app/.venv/bin/python src/ingest.py
+        --endpoint teams
+        --league-id {{ inputs.league_id }}
+        --season {{ inputs.season }}
