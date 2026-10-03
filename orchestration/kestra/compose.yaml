@@ -19,11 +19,12 @@ services:
     ports:
       - "8080:8080"
     env_file: .env
-    environment:
-      KESTRA_VARIABLES_ENV_VARS_ENABLED: "true"
-      KESTRA_VARIABLES_ENV_VARS_PREFIX: ""
+    environment: 
       KESTRA_CONFIGURATION: |
         kestra:
+          variables:
+            env-vars-enabled: true
+            env-vars-prefix: "FLOW_"
           server:
             basicAuth:
               enabled: true
@@ -36,7 +37,7 @@ services:
           storage:
             type: local
             local:
-              basePath: /app/storage
+              base-path: /app/storage
         datasources:
           postgres:
             url: jdbc:postgresql://kestra_db:5432/${POSTGRES_DB}
