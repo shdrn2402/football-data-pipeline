@@ -1,5 +1,5 @@
 id: football_bootstrap_dimensions
-namespace: football
+namespace: football.dev
 description: |
   One-off/seasonal bootstrap flow for Dimension tables.
   Extracts league metadata and teams/venues into raw Data Lake storage.
@@ -26,8 +26,8 @@ tasks:
     env:
       AWS_ACCESS_KEY_ID: "{{ envs.aws_access_key_id }}"
       AWS_SECRET_ACCESS_KEY: "{{ envs.aws_secret_access_key }}"
-      AWS_DEFAULT_REGION: "{{ envs.aws_default_region }}"
-      AWS_S3_LANDING_BUCKET_NAME: "{{ envs.aws_s3_landing_bucket_name }}"
+      AWS_DEFAULT_REGION: "{{ kv('aws_default_region') }}"
+      AWS_S3_LANDING_BUCKET_NAME: "{{ kv('aws_s3_landing_bucket_name') }}"
       API_FOOTBALL_KEY: "{{ envs.api_football_key }}"
       UV_NO_CACHE: "1"
       INGEST_LEAGUE_ID: "{{ inputs.league_id }}"
@@ -45,8 +45,8 @@ tasks:
     env:
       AWS_ACCESS_KEY_ID: "{{ envs.aws_access_key_id }}"
       AWS_SECRET_ACCESS_KEY: "{{ envs.aws_secret_access_key }}"
-      AWS_DEFAULT_REGION: "{{ envs.aws_default_region }}"
-      AWS_S3_LANDING_BUCKET_NAME: "{{ envs.aws_s3_landing_bucket_name }}"
+      AWS_DEFAULT_REGION: "{{ kv('aws_default_region') }}"
+      AWS_S3_LANDING_BUCKET_NAME: "{{ kv('aws_s3_landing_bucket_name') }}"
       API_FOOTBALL_KEY: "{{ envs.api_football_key }}"
       UV_NO_CACHE: "1"
       INGEST_LEAGUE_ID: "{{ inputs.league_id }}"
