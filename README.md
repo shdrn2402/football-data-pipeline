@@ -53,14 +53,21 @@ flowchart TD
 
 ```text
 football-data-pipeline/
-├── configs/             # YAML configurations for API endpoints and limits
-├── terraform/           # IaC definitions (S3, IAM, State backend)
-├── src/                 # Core Python source code (CLI app & utilities)
-├── backups/             # Local database and state backups
-├── compose.yaml         # Services orchestration (Kestra + Metadata DB)
-├── Dockerfile           # Secure container build recipe (Python 3.13 + uv)
-├── pyproject.toml       # Project metadata and dependencies
-└── uv.lock              # Locked dependency tree
+├── configs/                  # Pipeline configs and API endpoint definitions
+├── orchestration/            # Docker Compose recipes and Kestra flow definitions
+├── src/                      # Clean Architecture source code
+│   └── football_pipeline/
+│       ├── cli.py            # CLI entrypoint
+│       ├── core/             # Configuration and logging
+│       ├── domain/           # Domain schemas and entities
+│       ├── extractors/       # API-Sports extraction clients
+│       ├── services/         # Ingestion orchestration services
+│       └── storage/          # S3 storage clients and uploaders
+├── terraform/                # IaC definitions (S3, IAM, State backend)
+├── tests/                    # Unit and integration test suite
+├── Dockerfile                # Hardened container build recipe (Python 3.13 + uv)
+├── pyproject.toml            # Project packaging metadata and build definitions
+└── uv.lock                   # Locked dependency tree
 ```
 
 ## 🛠 Tech Stack
@@ -68,7 +75,8 @@ football-data-pipeline/
 | Domain | Tools / Technologies |
 | :--- | :--- |
 | **Language** | Python 3.13 |
-| **Dependency Management** | Astral `uv` |
+| **Dependency Management** | Astral `uv`, `hatchling` |
+| ** CLI Framework** | `click` |
 | **Cloud Storage** | AWS S3 |
 | **Infrastructure as Code** | Terraform (AWS Provider ~> 6.0) |
 | **Orchestration** | Kestra 2.0, PostgreSQL 18 |
@@ -109,7 +117,7 @@ KESTRA_PASSWORD=your_kestra_password
 ### 3. Launch Orchestrator
 Start Kestra and its PostgreSQL backend:
 ```bash
-docker compose up -d
+docker compose -f orchestration/compose.yaml up -d
 ```
 
 Access the Kestra Web UI at `http://localhost:8080`.
@@ -117,12 +125,13 @@ Access the Kestra Web UI at `http://localhost:8080`.
 ### 4. Run Manual Ingestion
 You can test the ingestion engine directly using uv:
 ```bash
-uv run python src/ingest.py --endpoint fixtures --league 39 --season 2024
+uv run football-pipeline --endpoint leagues --league-id 39
+uv run football-pipeline --endpoint teams --league-id 39 --season 2024
 ```
 
 Or run it inside the Docker container:
 ```bash
-docker compose run --rm ingest-app --endpoint fixtures --league 39 --season 2024
+docker run --rm --env-file .env football-pipeline:latest football-pipeline --endpoint leagues --league-id 39
 ```
 
 ---
