@@ -1,5 +1,9 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
-name = "de-zoomcamp"
+name = "football-pipeline"
 version = "0.1.0"
 requires-python = ">=3.13"
 dependencies = [
@@ -13,6 +17,12 @@ dependencies = [
     "requests>=2.34.2",
 ]
 
+[project.scripts]
+football-pipeline = "football_pipeline.cli:cli"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/football_pipeline"]
+
 [dependency-groups]
 dev = [
     "ipykernel>=7.3.0",
@@ -23,3 +33,4 @@ dev = [
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+testpaths = ["tests"]

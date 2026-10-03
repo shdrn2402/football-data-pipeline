@@ -1,6 +1,7 @@
 # Virtual Environments
 .env
 .env.*
+orchestration/kestra/.env
 !.env.example
 .venv/
 env/

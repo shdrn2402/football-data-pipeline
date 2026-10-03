@@ -1,6 +1,6 @@
 import pytest
 
-from utils import build_s3_key
+from football_pipeline.storage.s3 import build_s3_key
 
 
 @pytest.mark.parametrize(

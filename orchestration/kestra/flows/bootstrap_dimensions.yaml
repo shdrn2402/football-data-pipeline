@@ -33,10 +33,7 @@ tasks:
       INGEST_LEAGUE_ID: "{{ inputs.league_id }}"
       INGEST_SEASON: "{{ inputs.season }}"
     commands:
-      - cd /app
-      - /app/.venv/bin/python src/ingest.py
-        --endpoint leagues
-        --league-id {{ inputs.league_id }}
+      - /app/.venv/bin/football-pipeline --endpoint leagues --league-id {{ inputs.league_id }}
 
   - id: ingest_teams_dimension
     type: io.kestra.plugin.scripts.shell.Commands
@@ -55,8 +52,4 @@ tasks:
       INGEST_LEAGUE_ID: "{{ inputs.league_id }}"
       INGEST_SEASON: "{{ inputs.season }}"
     commands:
-      - cd /app
-      - /app/.venv/bin/python src/ingest.py
-        --endpoint teams
-        --league-id {{ inputs.league_id }}
-        --season {{ inputs.season }}
+      - /app/.venv/bin/football-pipeline --endpoint teams --league-id {{ inputs.league_id }} --season {{ inputs.season }}
