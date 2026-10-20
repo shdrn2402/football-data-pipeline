@@ -25,6 +25,7 @@ htmlcov/
 .vscode/
 .idea/
 .ipynb_checkpoints/
+notebooks/
 
 # Data & Logs
 *.csv

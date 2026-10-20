@@ -64,18 +64,45 @@ resource "aws_iam_user_policy" "data_loader_policy" {
   policy = data.aws_iam_policy_document.data_loader_policy.json
 }
 
-output "loader_access_key_id" {
-  description = "AWS Access Key ID for data ingestion"
-  value       = aws_iam_access_key.data_loader_keys.id
+resource "aws_iam_user" "guest_user" {
+  name          = local.iam_guest_user_name
+  force_destroy = true
 }
 
-output "loader_secret_access_key" {
-  description = "AWS Secret Access Key for data ingestion"
-  value       = aws_iam_access_key.data_loader_keys.secret
-  sensitive   = true
+resource "aws_iam_access_key" "guest_user_keys" {
+  user = aws_iam_user.guest_user.name
 }
 
-output "s3_bucket_name" {
-  description = "S3 bucket name for data landing zone"
-  value       = aws_s3_bucket.data_landing_zone.bucket
+data "aws_iam_policy_document" "guest_user_policy" {
+  statement {
+    effect = "Allow"
+    actions = [
+      "s3:ListBucket"
+    ]
+    resources = [
+      aws_s3_bucket.data_landing_zone.arn
+    ]
+  }
+  statement {
+    effect = "Allow"
+    actions = [
+      "s3:GetObject"
+    ]
+    resources = [
+      "${aws_s3_bucket.data_landing_zone.arn}/*"
+    ]
+  }
 }
+
+resource "aws_iam_user_policy" "guest_user_policy" {
+  name   = local.iam_guest_user_policy
+  user   = aws_iam_user.guest_user.name
+  policy = data.aws_iam_policy_document.guest_user_policy.json
+}
+
+resource "aws_iam_user_login_profile" "guest_user_profile" {
+  user                    = aws_iam_user.guest_user.name
+  password_reset_required = true
+}
+
+data "aws_caller_identity" "current" {}
