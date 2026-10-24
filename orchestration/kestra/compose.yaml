@@ -1,12 +1,16 @@
+---
 services:
-  kestra_db:
+  kestra-db:
     image: postgres:18
     container_name: kestra-database
-    env_file: .env
+    environment:
+      POSTGRES_USER: ${KESTRA_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${KESTRA_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${KESTRA_POSTGRES_DB}
     volumes:
-      - kestra_db_data:/var/lib/postgresql
+      - kestra-db-volume:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: ["CMD", "pg_isready", "-U", "${KESTRA_POSTGRES_USER}", "-d", "${KESTRA_POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -18,7 +22,8 @@ services:
     command: server standalone
     ports:
       - "8080:8080"
-    env_file: .env
+    env_file:
+      - ${ENV_FILE_PATH:-../../.env}
     environment: 
       KESTRA_CONFIGURATION: |
         kestra:
@@ -40,24 +45,23 @@ services:
               base-path: /app/storage
         datasources:
           postgres:
-            url: jdbc:postgresql://kestra_db:5432/${POSTGRES_DB}
+            url: jdbc:postgresql://kestra-db:5432/${KESTRA_POSTGRES_DB}
             driverClassName: org.postgresql.Driver
-            username: ${POSTGRES_USER}
-            password: ${POSTGRES_PASSWORD}
-
+            username: ${KESTRA_POSTGRES_USER}
+            password: ${KESTRA_POSTGRES_PASSWORD}
     volumes:
-      - kestra_data:/app/storage
+      - kestra-volume:/app/storage
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp/kestra-wd:/tmp/kestra-wd
     depends_on:
-      kestra_db:
+      kestra-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8081/health || exit 1"]
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
       interval: 10s
       timeout: 5s
       retries: 5
 
 volumes:
-  kestra_db_data:
-  kestra_data:
+  kestra-db-volume:
+  kestra-volume:
