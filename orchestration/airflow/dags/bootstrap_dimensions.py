@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from datetime import UTC, datetime
 
 from airflow.providers.docker.operators.docker import DockerOperator
@@ -10,10 +9,8 @@ SHARED_DOCKER_ENV = {
     "AWS_ACCESS_KEY_ID": "{{ conn.aws_s3_conn.login }}",
     "AWS_SECRET_ACCESS_KEY": "{{ conn.aws_s3_conn.password }}",
     "AWS_DEFAULT_REGION": "{{ conn.aws_s3_conn.extra_dejson.get('region_name', 'eu-central-1') }}",
-    "AWS_S3_LANDING_BUCKET_NAME": os.environ.get(
-        "AWS_S3_LANDING_BUCKET_NAME", "football-data-pipeline-landing-zone-dev"
-    ),
-    "API_FOOTBALL_KEY": os.environ.get("FLOW_API_FOOTBALL_KEY", ""),
+    "AWS_S3_LANDING_BUCKET_NAME": "{{ var.value.landing_bucket_name }}",
+    "API_FOOTBALL_KEY": "{{ conn.api_football_conn.password }}",
     "UV_NO_CACHE": "1",
 }
 
