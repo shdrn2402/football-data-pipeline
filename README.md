@@ -80,10 +80,10 @@ football-data-pipeline/
 | :--- | :--- |
 | **Language** | Python 3.13 |
 | **Dependency Management** | Astral `uv`, `hatchling` |
-| ** CLI Framework** | `click` |
+| **CLI Framework** | `click` |
 | **Cloud Storage** | AWS S3 |
 | **Infrastructure as Code** | Terraform (AWS Provider ~> 6.0) |
-| **Orchestration** | Kestra 2.0, PostgreSQL 18 |
+| **Orchestration** | Apache Airflow 3.3.2, Kestra 2.0, PostgreSQL 18 |
 | **Containerization** | Docker, Docker Compose |
 
 ---
@@ -137,12 +137,13 @@ KESTRA_PASSWORD=admin_password
 ```
 
 ### 3. Launch Orchestrator
-Start Kestra and its PostgreSQL backend:
+Lounch Airflow:
 ```bash
-# To launch Apache Airflow:
 docker compose --env-file .env -f orchestration/airflow/compose.yaml up -d
+```
 
-# OR to launch Kestra:
+Or Kestra:
+```bash
 docker compose --env-file .env -f orchestration/kestra/compose.yaml up -d
 ```
 
