@@ -4,10 +4,10 @@
 [![Package Manager: uv](https://img.shields.io/badge/package--manager-uv-brightgreen)](https://docs.astral.sh/uv/)
 [![IaC: Terraform](https://img.shields.io/badge/IaC-Terraform-purple)](https://www.terraform.io/)
 [![Cloud: AWS S3](https://img.shields.io/badge/Cloud-AWS%20S3-orange)](https://aws.amazon.com/s3/)
-[![Orchestrator: Kestra](https://img.shields.io/badge/Orchestrator-Kestra-blueviolet)](https://kestra.io/)
+[![Orchestrator: Airflow & Kestra](https://img.shields.io/badge/Orchestrator-Airflow%20%7C%20Kestra-blueviolet)]()
 [![Project Status: In Progress](https://img.shields.io/badge/Status-In%20Progress-yellow)](#)
 
-An end-to-end Data Engineering ELT pipeline designed to extract football sports statistics from API-Sports, store raw JSON payloads into an AWS S3 Data Lake, and automate batch execution workflows with Kestra.
+An end-to-end Data Engineering ELT pipeline designed to extract football sports statistics from API-Sports, store raw JSON payloads into an AWS S3 Data Lake, and automate batch execution workflows with Apache Airflow or Kestra.
 
 >💡 Project Background:
 >This project is inspired by the DataTalks.Club Data Engineering Zoomcamp, but completely re-engineered around a live external sports domain instead of the default NYC Taxi dataset.
@@ -22,8 +22,9 @@ flowchart TD
         TF -.->|Scoped Policies| IAM[AWS IAM Data Loader]
     end
 
-    subgraph Orchestration ["Orchestration Layer (Kestra)"]
-        Kestra[Kestra Orchestrator] -->|Triggers Scheduled Job| IngestApp[Containerized Python CLI]
+    subgraph Orchestration ["Orchestration Layer"]
+        Airflow[Apache Airflow] -->|Triggers Scheduled Job| IngestApp[Containerized Python CLI]
+        Kestra[Kestra Orchestrator] -->|Triggers Scheduled Job| IngestApp
     end
 
     subgraph DataFlow ["Data Ingestion Flow"]
@@ -54,7 +55,9 @@ flowchart TD
 ```text
 football-data-pipeline/
 ├── configs/                  # Pipeline configs and API endpoint definitions
-├── orchestration/            # Docker Compose recipes and Kestra flow definitions
+├── orchestration/            
+│   ├── airflow/              # Apache Airflow compose.yaml and DAGs
+│   └── kestra/               # Kestra compose.yaml and Flows
 ├── src/                      # Clean Architecture source code
 │   └── football_pipeline/
 │       ├── cli.py            # CLI entrypoint
@@ -63,7 +66,8 @@ football-data-pipeline/
 │       ├── extractors/       # API-Sports extraction clients
 │       ├── services/         # Ingestion orchestration services
 │       └── storage/          # S3 storage clients and uploaders
-├── terraform/                # IaC definitions (S3, IAM, State backend)
+├── terraform/                # IaC definitions (S3, IAM)
+├── terraform-backend/        # IaC state bucket and lock table definitions
 ├── tests/                    # Unit and integration test suite
 ├── Dockerfile                # Hardened container build recipe (Python 3.13 + uv)
 ├── pyproject.toml            # Project packaging metadata and build definitions
@@ -89,7 +93,13 @@ football-data-pipeline/
 ### 1. Provision Infrastructure with Terraform
 Navigate to the terraform directory to initialize and deploy the S3 Data Lake and IAM credentials:
 ```bash
-cd terraform
+# 1. Initialize remote state and lock table
+cd terraform-backend
+terraform init
+terraform apply -auto-approve
+
+# 2. Provision landing zone and IAM
+cd ../terraform
 terraform init
 terraform plan -var="environment=dev"
 terraform apply -var="environment=dev"
@@ -99,25 +109,41 @@ terraform apply -var="environment=dev"
 Create a .env file in the project root based on your credentials:
 
 ```.env
-API_FOOTBALL_KEY=your_football_api_key
+# Ingestion API Configuration
+FLOW_API_FOOTBALL_KEY=your_football_api_key
 
-AWS_ACCESS_KEY_ID=your_aws_access_key_id
-AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key
+# AWS Configuration & Credentials
+FLOW_AWS_ACCESS_KEY_ID=your_aws_access_key_id
+FLOW_AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key
 AWS_DEFAULT_REGION=eu-central-1
-AWS_S3_BUCKET_NAME=football-data-pipeline-landing-zone-dev
+AWS_S3_LANDING_BUCKET_NAME=football-data-pipeline-landing-zone-dev
 
-POSTGRES_USER=your_postgres_user_name
-POSTGRES_PASSWORD=your_postgres_password
-POSTGRES_DB=database_name
+# Airflow Credentials & Security
+AIRFLOW_POSTGRES_USER=airflow
+AIRFLOW_POSTGRES_PASSWORD=airflow
+AIRFLOW_POSTGRES_DB=airflow
+_AIRFLOW_WWW_USER_USERNAME=admin
+_AIRFLOW_WWW_USER_PASSWORD=admin
+AIRFLOW_UID=50000
+AIRFLOW_DOCKER_GID=999
+FERNET_KEY=your_fernet_key_here
 
-KESTRA_USER=valid_email
-KESTRA_PASSWORD=your_kestra_password
+# Kestra Credentials
+KESTRA_POSTGRES_USER=kestra
+KESTRA_POSTGRES_PASSWORD=kestra_password
+KESTRA_POSTGRES_DB=kestra
+KESTRA_USER=admin@example.com
+KESTRA_PASSWORD=admin_password
 ```
 
 ### 3. Launch Orchestrator
 Start Kestra and its PostgreSQL backend:
 ```bash
-docker compose -f orchestration/compose.yaml up -d
+# To launch Apache Airflow:
+docker compose --env-file .env -f orchestration/airflow/compose.yaml up -d
+
+# OR to launch Kestra:
+docker compose --env-file .env -f orchestration/kestra/compose.yaml up -d
 ```
 
 Access the Kestra Web UI at `http://localhost:8080`.
@@ -141,8 +167,9 @@ docker run --rm --env-file .env football-pipeline:latest football-pipeline --end
 - [x] Cloud infrastructure as code with Terraform (S3, IAM, S3 Remote State & DynamoDB Lock)
 - [x] Ingestion CLI engine with rate-limiting, pagination, and S3 partitioning
 - [x] Secure Docker container build with Astral uv and non-root user execution
-- [x] Kestra 2.0 orchestration deployment via Docker Compose
-- [ ] End-to-end scheduled batch ingestion flows in Kestra
+- [x] Orchestration deployment via Docker Compose (Apache Airflow 3 & Kestra 2.0)
+- [x] Bootstrap flows and DAGs for dimension tables extraction (Leagues, Teams)
+- [ ] Scheduled daily batch ingestion flows for facts
 - [ ] Data Warehouse integration (ClickHouse or BigQuery)
 - [ ] Data modeling and staging layer with dbt
 - [ ] Interactive analytical dashboard (Metabase or Superset)
