@@ -65,6 +65,7 @@ airflow.db
 airflow.cfg
 airflow-logs/
 logs/
+orchestration/airflow/logs/
 .dagster/
 .prefect/
 
@@ -73,7 +74,6 @@ logs/
 *tfvars
 *.tfstate
 *.tfstate.backup
-.terraform.lock.hcl
 
 # OS
 .DS_Store
