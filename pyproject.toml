@@ -19,6 +19,7 @@ dependencies = [
 
 [project.scripts]
 football-pipeline = "football_pipeline.cli:cli"
+football-warehouse = "football_pipeline.warehouse.cli:cli"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/football_pipeline"]

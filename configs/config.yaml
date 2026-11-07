@@ -25,7 +25,7 @@ api:
 
     fixtures:
       path: "/fixtures"
-      allowed_params: ["league", "season", "team", "date", "live", "status", "from", "to", "round"]
+      allowed_params: ["league", "season", "team", "live", "status", "from", "to", "round"]
       s3_template: "raw/facts/fixtures/league_id={league}/season={season}/date={target_date}"
 
     fixtures_rounds:

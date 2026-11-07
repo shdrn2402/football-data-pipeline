@@ -23,6 +23,7 @@ x-airflow-common: &airflow-common
     # --- Connections ---
     AIRFLOW_CONN_AWS_S3_CONN: '{"conn_type": "aws", "login": "${FLOW_AWS_ACCESS_KEY_ID}", "password": "${FLOW_AWS_SECRET_ACCESS_KEY}", "extra": {"region_name": "${AWS_DEFAULT_REGION:-eu-central-1}"}}'
     AIRFLOW_CONN_API_FOOTBALL_CONN: '{"conn_type": "generic", "password": "${FLOW_API_FOOTBALL_KEY}"}'
+    AIRFLOW_CONN_CLICKHOUSE_CONN: '{"conn_type": "generic", "host": "clickhouse", "port": 8123, "login": "${CLICKHOUSE_USER}", "password": "${CLICKHOUSE_PASSWORD}", "schema": "${CLICKHOUSE_DB}"}'
     AIRFLOW_VAR_LANDING_BUCKET_NAME: ${AWS_S3_LANDING_BUCKET_NAME}
   group_add:
     - "${AIRFLOW_DOCKER_GID:-999}"
@@ -146,6 +147,11 @@ services:
       retries: 5
       start_period: 30s
     restart: always
+
+# A fixed name lets DockerOperator tasks join this network and reach ClickHouse.
+networks:
+  default:
+    name: football_airflow
 
 volumes:
   airflow-db-volume:
