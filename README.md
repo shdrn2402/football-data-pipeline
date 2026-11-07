@@ -194,13 +194,15 @@ Unpause and trigger `football_fixtures_elt` in the Airflow UI (parameters: `leag
 2. `load_fixtures_to_clickhouse`: S3 to `raw_fixtures`, then `stg_fixtures`.
 3. `build_team_points_mart`: `stg_fixtures` to `mart_team_points`.
 
-Check the result in the ClickHouse SQL UI:
+Check the result in the ClickHouse SQL UI. It connects to the `default` database, so qualify tables with your `CLICKHOUSE_DB` (`clickhouse` in `env.example`):
 ```sql
 SELECT team_name, played, wins, draws, losses, points
-FROM mart_team_points
+FROM clickhouse.mart_team_points
 WHERE league_id = 39 AND season = 2023
 ORDER BY points DESC, goals_for - goals_against DESC;
 ```
+
+![Team points mart for Premier League 2023](docs/screenshots/clickhouse_mart_team_points.png)
 
 The DAG exists only in Airflow for now; Kestra still runs the dimensions bootstrap only.
 
@@ -225,9 +227,13 @@ Each S3 path contains `date=<snapshot date>`, the day the data was extracted rat
 **Re-runs and duplicates.** Replacement happens during background merges, so duplicates can physically exist for a while. Read `raw_fixtures` and `stg_fixtures` with `FINAL`, as the pipeline does:
 
 ```sql
-SELECT count() AS physical_rows, uniqExact(fixture_id) AS matches FROM stg_fixtures;  -- rows may exceed matches
-SELECT count() FROM stg_fixtures FINAL;                                               -- always one row per match
+SELECT count() AS physical_rows, uniqExact(fixture_id) AS matches FROM clickhouse.stg_fixtures;  -- rows may exceed matches
+SELECT count() FROM clickhouse.stg_fixtures FINAL;  -- always one row per match
 ```
+
+After the DAG ran twice, `stg_fixtures` physically held 760 rows, and `FINAL` returned one row for each of the 380 matches:
+
+![Deduplicated fixtures after a repeated DAG run](docs/screenshots/clickhouse_stg_fixtures_final.png)
 
 **Known limitation.** `mart_team_points` counts points from match results only. Points deductions are not in the fixtures data, so a sanctioned team shows more points than the official table.
 
