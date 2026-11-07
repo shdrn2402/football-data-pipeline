@@ -23,8 +23,8 @@ flowchart TD
     end
 
     subgraph Orchestration ["Orchestration Layer"]
-        Airflow[Apache Airflow] -->|Triggers Scheduled Job| IngestApp[Containerized Python CLI]
-        Kestra[Kestra Orchestrator] -->|Triggers Scheduled Job| IngestApp
+        Airflow[Apache Airflow] -->|Triggers Manual Job| IngestApp[Containerized Python CLI]
+        Kestra[Kestra Orchestrator] -->|Triggers Manual Job| IngestApp
     end
 
     subgraph DataFlow ["Data Ingestion Flow"]
@@ -33,7 +33,7 @@ flowchart TD
     end
 
     subgraph FutureScope ["Planned Staging & Analytics (In Progress)"]
-        S3 -.->|Batch Load| DWH[(Data Warehouse)]
+        S3 -.->|Batch Load| DWH[(ClickHouse Data Warehouse)]
         DWH -.->|dbt Models| Marts[Fact & Dimension Tables]
         Marts -.-> BI[Dashboards]
     end
@@ -44,9 +44,10 @@ flowchart TD
 ## ⚙️ Key Technical Features
 
 * **Infrastructure as Code (IaC):** AWS S3 landing bucket and scoped IAM ingestion policies managed via **Terraform** (~> 6.0) with remote S3 backend state and DynamoDB state locking.
-* **Resilient Ingestion Engine (`src/`):** Parameterized CLI built with `click` and `requests`. Features automated pagination, rate-limit sleep windows, dynamic S3 folder partitioning (`league_id / season / ingest_date`), and structured logging.
-* **Orchestration Layer:** **Kestra 2.0** deployed as a standalone server backed by PostgreSQL 18 for pipeline scheduling and task execution.
-* **Secure & Fast Containerization:** Multi-stage/lightweight Docker images leveraging Astral `uv` for sub-second dependency resolution, running under an unprivileged user (`ingest_user`) for container security.
+* **Resilient Ingestion Engine (`src/`):** Parameterized CLI built with `click` and `requests`. Features automated pagination, rate-limit sleep windows, dynamic S3 folder partitioning from per-endpoint templates (e.g. `league_id / season / date`), and structured logging.
+* **Orchestration Layer:** **Apache Airflow 3.3.2** and **Kestra 2.0** available as alternative Docker Compose stacks, each backed by its own PostgreSQL 18 metadata database for task execution.
+* **Local Data Warehouse:** **ClickHouse 26.8 LTS** included in each orchestration stack, with persistent volumes and a health check. Loading data from S3 is planned.
+* **Secure & Fast Containerization:** Lightweight Docker images leveraging Astral `uv` for sub-second dependency resolution, running under an unprivileged user (`ingest_user`) for container security.
 
 ---
 
@@ -68,7 +69,7 @@ football-data-pipeline/
 │       └── storage/          # S3 storage clients and uploaders
 ├── terraform/                # IaC definitions (S3, IAM)
 ├── terraform-backend/        # IaC state bucket and lock table definitions
-├── tests/                    # Unit and integration test suite
+├── tests/                    # Unit test suite
 ├── Dockerfile                # Hardened container build recipe (Python 3.13 + uv)
 ├── pyproject.toml            # Project packaging metadata and build definitions
 └── uv.lock                   # Locked dependency tree
@@ -84,6 +85,7 @@ football-data-pipeline/
 | **Cloud Storage** | AWS S3 |
 | **Infrastructure as Code** | Terraform (AWS Provider ~> 6.0) |
 | **Orchestration** | Apache Airflow 3.3.2, Kestra 2.0, PostgreSQL 18 |
+| **Data Warehouse** | ClickHouse 26.8 LTS |
 | **Containerization** | Docker, Docker Compose |
 
 ---
@@ -127,6 +129,8 @@ _AIRFLOW_WWW_USER_PASSWORD=admin
 AIRFLOW_UID=50000
 AIRFLOW_DOCKER_GID=999
 FERNET_KEY=your_fernet_key_here
+AIRFLOW__API_AUTH__JWT_SECRET=your_generated_jwt_secret_here
+AIRFLOW__API_AUTH__JWT_ISSUER=football-data-pipeline
 
 # Kestra Credentials
 KESTRA_POSTGRES_USER=kestra
@@ -134,10 +138,21 @@ KESTRA_POSTGRES_PASSWORD=kestra_password
 KESTRA_POSTGRES_DB=kestra
 KESTRA_USER=admin@example.com
 KESTRA_PASSWORD=admin_password
+
+# ClickHouse Credentials
+CLICKHOUSE_USER=clickhouse
+CLICKHOUSE_PASSWORD=your_clickhouse_db_password
+CLICKHOUSE_DB=clickhouse
 ```
 
-### 3. Launch Orchestrator
-Lounch Airflow:
+### 3. Build the Ingestion Image
+The manual Docker run, Airflow DAG, and Kestra flow all use this image:
+```bash
+docker build -t football-pipeline:latest .
+```
+
+### 4. Launch Orchestrator
+Launch Airflow:
 ```bash
 docker compose --env-file .env -f orchestration/airflow/compose.yaml up -d
 ```
@@ -147,9 +162,16 @@ Or Kestra:
 docker compose --env-file .env -f orchestration/kestra/compose.yaml up -d
 ```
 
-Access the Kestra Web UI at `http://localhost:8080`.
+Run one stack at a time: both publish ports `8080`, `8123`, and `9000`. Each stack has its own ClickHouse instance and volumes, so data is not shared between them.
 
-### 4. Run Manual Ingestion
+| Service | Address |
+| :--- | :--- |
+| Airflow or Kestra Web UI | `http://localhost:8080` |
+| ClickHouse health check | `http://localhost:8123/ping` |
+| ClickHouse SQL UI | `http://localhost:8123/play` |
+| ClickHouse native TCP | `localhost:9000` |
+
+### 5. Run Manual Ingestion
 You can test the ingestion engine directly using uv:
 ```bash
 uv run football-pipeline --endpoint leagues --league-id 39
@@ -171,6 +193,7 @@ docker run --rm --env-file .env football-pipeline:latest football-pipeline --end
 - [x] Orchestration deployment via Docker Compose (Apache Airflow 3 & Kestra 2.0)
 - [x] Bootstrap flows and DAGs for dimension tables extraction (Leagues, Teams)
 - [ ] Scheduled daily batch ingestion flows for facts
-- [ ] Data Warehouse integration (ClickHouse or BigQuery)
+- [x] Local ClickHouse deployment via Docker Compose
+- [ ] Batch loading from S3 into ClickHouse
 - [ ] Data modeling and staging layer with dbt
 - [ ] Interactive analytical dashboard (Metabase or Superset)
