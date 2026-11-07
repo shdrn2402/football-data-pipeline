@@ -32,8 +32,11 @@ flowchart TD
         IngestApp -->|Boto3 / Raw JSON| S3
     end
 
-    subgraph FutureScope ["Planned Staging & Analytics (In Progress)"]
-        S3 -.->|Batch Load| DWH[(ClickHouse Data Warehouse)]
+    subgraph Warehouse ["Data Warehouse (Airflow)"]
+        S3 -->|s3 table function| DWH[(ClickHouse: raw, staging, mart)]
+    end
+
+    subgraph FutureScope ["Planned Analytics"]
         DWH -.->|dbt Models| Marts[Fact & Dimension Tables]
         Marts -.-> BI[Dashboards]
     end
@@ -46,7 +49,7 @@ flowchart TD
 * **Infrastructure as Code (IaC):** AWS S3 landing bucket and scoped IAM ingestion policies managed via **Terraform** (~> 6.0) with remote S3 backend state and DynamoDB state locking.
 * **Resilient Ingestion Engine (`src/`):** Parameterized CLI built with `click` and `requests`. Features automated pagination, rate-limit sleep windows, dynamic S3 folder partitioning from per-endpoint templates (e.g. `league_id / season / date`), and structured logging.
 * **Orchestration Layer:** **Apache Airflow 3.3.2** and **Kestra 2.0** available as alternative Docker Compose stacks, each backed by its own PostgreSQL 18 metadata database for task execution.
-* **Local Data Warehouse:** **ClickHouse 26.8 LTS** included in each orchestration stack, with persistent volumes and a health check. Loading data from S3 is planned.
+* **Local Data Warehouse:** **ClickHouse 26.8 LTS** included in each orchestration stack, with persistent volumes and a health check. The Airflow DAG `football_fixtures_elt` loads match results from S3 into raw and staging tables and builds a team points mart.
 * **Secure & Fast Containerization:** Lightweight Docker images leveraging Astral `uv` for sub-second dependency resolution, running under an unprivileged user (`ingest_user`) for container security.
 
 ---
@@ -66,7 +69,8 @@ football-data-pipeline/
 │       ├── domain/           # Domain schemas and entities
 │       ├── extractors/       # API-Sports extraction clients
 │       ├── services/         # Ingestion orchestration services
-│       └── storage/          # S3 storage clients and uploaders
+│       ├── storage/          # S3 storage clients and uploaders
+│       └── warehouse/        # ClickHouse loading CLI and SQL models
 ├── terraform/                # IaC definitions (S3, IAM)
 ├── terraform-backend/        # IaC state bucket and lock table definitions
 ├── tests/                    # Unit test suite
@@ -183,6 +187,56 @@ Or run it inside the Docker container:
 docker run --rm --env-file .env football-pipeline:latest football-pipeline --endpoint leagues --league-id 39
 ```
 
+### 6. Run the Fixtures ELT DAG
+Unpause and trigger `football_fixtures_elt` in the Airflow UI (parameters: `league_id`, `season`). It runs three tasks:
+
+1. `extract_fixtures`: API-Football to S3.
+2. `load_fixtures_to_clickhouse`: S3 to `raw_fixtures`, then `stg_fixtures`.
+3. `build_team_points_mart`: `stg_fixtures` to `mart_team_points`.
+
+Check the result in the ClickHouse SQL UI. It connects to the `default` database, so qualify tables with your `CLICKHOUSE_DB` (`clickhouse` in `env.example`):
+```sql
+SELECT team_name, played, wins, draws, losses, points
+FROM clickhouse.mart_team_points
+WHERE league_id = 39 AND season = 2023
+ORDER BY points DESC, goals_for - goals_against DESC;
+```
+
+![Team points mart for Premier League 2023](docs/screenshots/clickhouse_mart_team_points.png)
+
+The DAG exists only in Airflow for now; Kestra still runs the dimensions bootstrap only.
+
+---
+
+## 🗄 ClickHouse Data Model
+
+Each S3 path contains `date=<snapshot date>`, the day the data was extracted rather than the day a match was played. Every snapshot of a season stays in S3, and ClickHouse resolves them to one row per match.
+
+| Table | ENGINE | PARTITION BY | ORDER BY |
+| :--- | :--- | :--- | :--- |
+| `raw_fixtures` | `ReplacingMergeTree(ingested_at)` | `(league_id, season)` | `(league_id, season, snapshot_date, fixture_id)` |
+| `stg_fixtures` | `ReplacingMergeTree(ingested_at)` | `(league_id, season)` | `(league_id, season, fixture_id)` |
+| `mart_team_points` | `MergeTree` | `(league_id, season)` | `(league_id, season, team_id)` |
+
+**ENGINE.** Raw and staging use `ReplacingMergeTree` because loads repeat: rows with the same `ORDER BY` key are collapsed and the latest `ingested_at` wins, so a corrected score replaces the old one. The mart is rebuilt from scratch for its league and season, so it has nothing to deduplicate and a plain `MergeTree` is enough.
+
+**ORDER BY.** In ClickHouse this is also the deduplication key, so it defines what one row means. In `raw_fixtures` that is a match in a given snapshot, which keeps history. In `stg_fixtures` it is a match, which keeps only the current state. Queries always filter by league and season, so those columns come first.
+
+**PARTITION BY.** `ReplacingMergeTree` only deduplicates within a partition, so the partition key must not change for a given match. That rules out partitioning by match date: a rescheduled match would move to another partition and stay duplicated. League and season never change for a match, keep the partition count low, and let the mart drop exactly one season when it is rebuilt.
+
+**Re-runs and duplicates.** Replacement happens during background merges, so duplicates can physically exist for a while. Read `raw_fixtures` and `stg_fixtures` with `FINAL`, as the pipeline does:
+
+```sql
+SELECT count() AS physical_rows, uniqExact(fixture_id) AS matches FROM clickhouse.stg_fixtures;  -- rows may exceed matches
+SELECT count() FROM clickhouse.stg_fixtures FINAL;  -- always one row per match
+```
+
+After the DAG ran twice, `stg_fixtures` physically held 760 rows, and `FINAL` returned one row for each of the 380 matches:
+
+![Deduplicated fixtures after a repeated DAG run](docs/screenshots/clickhouse_stg_fixtures_final.png)
+
+**Known limitation.** `mart_team_points` counts points from match results only. Points deductions are not in the fixtures data, so a sanctioned team shows more points than the official table.
+
 ---
 
 ## 📌 Project Roadmap
@@ -194,6 +248,6 @@ docker run --rm --env-file .env football-pipeline:latest football-pipeline --end
 - [x] Bootstrap flows and DAGs for dimension tables extraction (Leagues, Teams)
 - [ ] Scheduled daily batch ingestion flows for facts
 - [x] Local ClickHouse deployment via Docker Compose
-- [ ] Batch loading from S3 into ClickHouse
+- [x] Batch loading from S3 into ClickHouse (fixtures, Airflow)
 - [ ] Data modeling and staging layer with dbt
 - [ ] Interactive analytical dashboard (Metabase or Superset)
