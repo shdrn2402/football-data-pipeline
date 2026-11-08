@@ -36,9 +36,9 @@
 
 * **Language:** English.
 * **Title Format:** `<Type>: <Description>`
-  * Prefix and description MUST start with a capital letter (Capital Case / Title Case)[cite: 4].
-  * Common types: `Feature:`, `Fix:`, `Chore:`[cite: 4].
-  * *Example:* `Feature: Implement Parent Orchestration Flow for Automated Data Ingestion`[cite: 4]
+  * Prefix and description MUST start with a capital letter (Capital Case / Title Case).
+  * Common types: `Feature:`, `Fix:`, `Chore:`.
+  * *Example:* `Feature: Implement Parent Orchestration Flow for Automated Data Ingestion`
 * **Body Requirements:**
   * Context / Description.
   * Task checklist (`- [ ]`).
@@ -50,8 +50,8 @@
 
 * **Language:** English.
 * **Title Format:** `<Type>(<scope>): <Description>`
-  * The type prefix and the description after the colon MUST start with a capital letter[cite: 4].
-  * *Example:* `Feature(kestra): Implement data ingestion flow`[cite: 4]
+  * The type prefix and the description after the colon MUST start with a capital letter.
+  * *Example:* `Feature(kestra): Implement data ingestion flow`
 * **Body Requirements:**
   * Must contain a brief summary of implemented changes.
   * Must link and automatically close the target issue using closing keywords (e.g., `Closes #<issue-id>`).
