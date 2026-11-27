@@ -193,16 +193,16 @@ Both CLIs load the file named by `PIPELINE_ENV_PATH` (default: `.env`). Variable
 export PIPELINE_ENV_PATH=.env.local
 
 uv run football-pipeline --endpoint leagues --league-id 39
-uv run football-pipeline --endpoint fixtures --league-id 39 --season 2023 --target-date 2026-11-08
+uv run football-pipeline --endpoint fixtures --league-id 39 --season 2023 --snapshot-date 2026-11-08
 
 # Requires the ClickHouse service of a running stack (step 4)
-uv run football-warehouse load-fixtures --league-id 39 --season 2023 --target-date 2026-11-08
+uv run football-warehouse load-fixtures --league-id 39 --season 2023 --snapshot-date 2026-11-08
 uv run football-warehouse build-team-points --league-id 39 --season 2023
 ```
 
 Match details (events, lineups, team and player statistics) are downloaded for the finished matches of a fixtures snapshot, so extract the snapshot first:
 ```bash
-uv run football-pipeline --endpoint match_details --league-id 39 --season 2023 --target-date 2026-11-08 --max-fixtures 3
+uv run football-pipeline --endpoint match_details --league-id 39 --season 2023 --snapshot-date 2026-11-08 --max-fixtures 3
 ```
 Each match is stored as `raw/facts/match_details/fixture_id=<id>/data.json`. Stored matches are skipped, so repeated runs continue the season. `--fixture-id` downloads one match again. `batch_size` in `configs/config.yaml` switches between one match per request (free plan) and up to 20 (paid plan).
 

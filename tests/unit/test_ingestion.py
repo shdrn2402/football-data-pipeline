@@ -27,13 +27,13 @@ def test_fixtures_request_covers_whole_season(monkeypatch):
 
     ingestion.run_ingestion_pipeline(
         endpoint="fixtures",
-        target_date="2026-11-07",
+        snapshot_date="2026-11-07",
         config=config,
         league_id=39,
         season=2023,
     )
 
-    # A "date" filter would limit the response to matches played on target_date.
+    # A "date" filter would limit the response to matches played on snapshot_date.
     assert captured["query_params"] == {"league": 39, "season": 2023}
     assert (
         captured["s3_key"]
@@ -57,7 +57,7 @@ def test_failed_fetch_does_not_upload_to_s3(monkeypatch):
     with pytest.raises(ValueError):
         ingestion.run_ingestion_pipeline(
             endpoint="fixtures",
-            target_date="2026-11-07",
+            snapshot_date="2026-11-07",
             config=config,
             league_id=39,
             season=2023,
@@ -85,7 +85,7 @@ def test_empty_response_is_uploaded_only_if_allowed(
     def run():
         ingestion.run_ingestion_pipeline(
             endpoint=endpoint,
-            target_date="2026-11-07",
+            snapshot_date="2026-11-07",
             config=config,
             league_id=39,
             season=2023,
@@ -162,7 +162,7 @@ def test_filters_are_part_of_s3_key(monkeypatch, endpoint, filters, expected_key
 
     ingestion.run_ingestion_pipeline(
         endpoint=endpoint,
-        target_date="2026-11-07",
+        snapshot_date="2026-11-07",
         config=config,
         league_id=39,
         season=2023,
@@ -196,7 +196,7 @@ def test_missing_key_value_fails_before_api_call(monkeypatch, endpoint):
     with pytest.raises((KeyError, ValueError)):
         ingestion.run_ingestion_pipeline(
             endpoint=endpoint,
-            target_date="2026-11-07",
+            snapshot_date="2026-11-07",
             config=config,
             league_id=39,
             season=2023,
@@ -234,7 +234,7 @@ def test_snapshot_date_is_sent_only_where_it_does_not_narrow(
     monkeypatch.setattr(ingestion, "upload_to_s3", lambda *args: None)
 
     ingestion.run_ingestion_pipeline(
-        endpoint=endpoint, target_date="2026-11-07", config=config, **kwargs
+        endpoint=endpoint, snapshot_date="2026-11-07", config=config, **kwargs
     )
 
     assert sent == [expected_params]

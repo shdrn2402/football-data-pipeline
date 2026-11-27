@@ -21,7 +21,9 @@ class Metadata(BaseModel):
     params: dict[str, Any] = Field(
         description="Query parameters used for the API request."
     )
-    target_date: str = Field(description="Logical execution date in YYYY-MM-DD format.")
+    snapshot_date: str = Field(
+        description="Date of the extraction snapshot (YYYY-MM-DD), not of the matches."
+    )
 
     model_config = ConfigDict(extra="forbid")
 

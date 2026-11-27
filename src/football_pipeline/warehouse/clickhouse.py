@@ -14,7 +14,7 @@ REQUEST_TIMEOUT_SECONDS = (10, 300)
 # Selects the raw rows of one snapshot.
 SNAPSHOT_FILTER = (
     "league_id = {league_id:UInt32} AND season = {season:UInt16} "
-    "AND snapshot_date = {target_date:Date}"
+    "AND snapshot_date = {snapshot_date:Date}"
 )
 
 
@@ -63,7 +63,7 @@ def run_sql_file(file_name: str, params: dict | None = None) -> None:
     logger.info(f"Executed {file_name}.")
 
 
-def build_fixtures_s3_url(league_id: int, season: int, target_date: str) -> str:
+def build_fixtures_s3_url(league_id: int, season: int, snapshot_date: str) -> str:
     """Builds the URL of one fixtures snapshot written by the ingestion step.
 
     The object key comes from the same s3_template that ingestion writes with.
@@ -72,7 +72,7 @@ def build_fixtures_s3_url(league_id: int, season: int, target_date: str) -> str:
     filters = {"league": league_id, "season": season}
     s3_key = build_s3_key(
         add_filter_partitions(template, filters),
-        target_date=target_date,
+        snapshot_date=snapshot_date,
         **filters,
     )
     bucket = os.environ["AWS_S3_LANDING_BUCKET_NAME"]
@@ -152,17 +152,21 @@ def check_staging_coverage(params: dict) -> None:
         raise ValueError(f"{missing} fixtures of the snapshot are missing in staging.")
 
 
-def load_fixtures(league_id: int, season: int, target_date: str) -> None:
+def load_fixtures(league_id: int, season: int, snapshot_date: str) -> None:
     """Loads one fixtures snapshot from S3 into the raw and staging tables.
 
     Raises:
         ValueError: If the snapshot holds no fixtures or fails a quality check,
             to fail instead of staying green.
     """
-    snapshot = {"league_id": league_id, "season": season, "target_date": target_date}
+    snapshot = {
+        "league_id": league_id,
+        "season": season,
+        "snapshot_date": snapshot_date,
+    }
     params = {
         **snapshot,
-        "s3_url": build_fixtures_s3_url(league_id, season, target_date),
+        "s3_url": build_fixtures_s3_url(league_id, season, snapshot_date),
     }
     run_sql_file("create_tables.sql")
     # A row without a fixture ID is never replaced by a corrected one, so a row

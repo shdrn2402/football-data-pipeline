@@ -15,10 +15,10 @@ def cli() -> None:
 @cli.command("load-fixtures")
 @click.option("--league-id", required=True, type=int)
 @click.option("--season", required=True, type=int)
-@click.option("--target-date", required=True, type=str, help="Snapshot date.")
-def load_fixtures_command(league_id: int, season: int, target_date: str) -> None:
+@click.option("--snapshot-date", required=True, type=str, help="Snapshot date.")
+def load_fixtures_command(league_id: int, season: int, snapshot_date: str) -> None:
     """Loads one fixtures snapshot from S3 into raw and staging tables."""
-    load_fixtures(league_id, season, target_date)
+    load_fixtures(league_id, season, snapshot_date)
 
 
 @cli.command("build-team-points")

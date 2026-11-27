@@ -10,9 +10,9 @@ from football_pipeline.warehouse import clickhouse
     "template",
     [
         None,  # the template of the real config
-        "another/layout/{league}/{season}/date={target_date}",
+        "another/layout/{league}/{season}/date={snapshot_date}",
         # Ingestion appends a filter the template lacks, so the URL must too.
-        "raw/facts/fixtures/league_id={league}/date={target_date}",
+        "raw/facts/fixtures/league_id={league}/date={snapshot_date}",
     ],
 )
 def test_build_fixtures_s3_url_matches_ingestion_key(monkeypatch, tmp_path, template):

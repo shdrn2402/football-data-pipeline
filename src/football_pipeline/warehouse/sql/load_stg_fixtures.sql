@@ -16,4 +16,4 @@ SELECT
 FROM raw_fixtures FINAL
 WHERE league_id = {league_id:UInt32}
   AND season = {season:UInt16}
-  AND snapshot_date = {target_date:Date};
+  AND snapshot_date = {snapshot_date:Date};
