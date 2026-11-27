@@ -9,6 +9,8 @@ from football_pipeline.services.match_details import (
     ENDPOINT as MATCH_DETAILS,
 )
 from football_pipeline.services.match_details import run_match_details_pipeline
+from football_pipeline.services.sidelined import ENDPOINT as SIDELINED
+from football_pipeline.services.sidelined import run_sidelined_pipeline
 
 
 @click.command()
@@ -107,6 +109,16 @@ def cli(
             season=season,
             fixture_id=fixture_id,
             max_fixtures=max_fixtures,
+        )
+        return
+
+    if endpoint == SIDELINED:
+        run_sidelined_pipeline(
+            config=config,
+            snapshot_date=snapshot_date,
+            league_id=league_id,
+            season=season,
+            team_id=team_id,
         )
         return
 

@@ -206,6 +206,13 @@ uv run football-pipeline --endpoint match_details --league-id 39 --season 2023 -
 ```
 Each match is stored as `raw/facts/match_details/fixture_id=<id>/data.json`. Stored matches are skipped, so repeated runs continue the season. `--fixture-id` downloads one match again. `batch_size` in `configs/config.yaml` switches between one match per request (free plan) and up to 20 (paid plan).
 
+Player profiles (date of birth, nationality) come with `players_statistics`. `sidelined` then downloads the injury and suspension periods of those players, 20 per request. The free plan returns only 3 pages of players, so try it on one team:
+```bash
+uv run football-pipeline --endpoint players_statistics --league-id 88 --season 2023 --team-id 194
+uv run football-pipeline --endpoint sidelined --league-id 88 --season 2023 --team-id 194
+```
+Both commands must use the same `--snapshot-date` (default: today).
+
 Or run the ingestion inside the Docker container:
 ```bash
 docker run --rm --env-file .env.local football-pipeline:latest football-pipeline --endpoint leagues --league-id 39

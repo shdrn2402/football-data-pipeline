@@ -84,7 +84,7 @@ A season is identified by its start year. The mart is rebuilt per season across 
 | Field | Type | Description |
 |---|---|---|
 | `injury_days_lost` | `Nullable(UInt16)` | Days out through injury or illness within the season (`/sidelined`) |
-| `injury_matches_missed` | `Nullable(UInt16)` | `/injuries` rows of type `Missing Fixture` with an injury or illness reason |
+| `injury_matches_missed` | `Nullable(UInt16)` | Club matches dated within an injury or illness period of `/sidelined` |
 | `suspension_matches_missed` | `Nullable(UInt16)` | `/injuries` rows of type `Missing Fixture` with reason `Red Card`, `Yellow Cards` or `Suspended` |
 | `availability_rate` | `Nullable(Decimal(4,3))` | `1 - injury_matches_missed / club matches`, from `0.000` to `1.000` |
 
@@ -112,6 +112,8 @@ A season is identified by its start year. The mart is rebuilt per season across 
 - **Age groups** (by `age_at_season_start`): under 21, 21 to 23, 24 and older.
 - **Impact substitutes:** `is_impact_sub` marks players below the threshold with at least 3 goals and assists combined.
 - **Availability:** only injuries and illness lower `availability_rate`. Suspensions are counted separately, and unused matches on the bench do not count.
+- **One source for all leagues:** availability comes from `/sidelined`, so leagues are comparable. `/injuries` has no data for some leagues and is used only to cross-check where it exists.
+- **Never asked or never absent:** a player in the requested list of a `/sidelined` snapshot without periods has no known absence. A player not in the list has `NULL`.
 - **Several clubs or leagues:** statistics are summed. Percentiles use the primary league.
 - **Efficiency index:** weighted percentiles with weights per position, a discipline penalty, multiplied by availability. Weights are fixed before any backtest.
 - **No data leakage:** features use only what was known on the season cut-off date. `next_season_market_value_eur`, `value_delta_eur` and `price_growth_pct` are targets and never feed the index.
@@ -143,12 +145,27 @@ A daily snapshot of the fixture list stays in S3, so changes can be replayed aft
 | Data | Endpoint | Notes |
 |---|---|---|
 | Match statistics, events, lineups | `/fixtures` with `id` (free plan) or `ids` (paid plan, up to 20 matches) | `ids` is rejected on the free plan |
-| Injuries per match | `/injuries` with `league` and `season` | No injury dates. Reasons include cards, suspensions and national team duty |
-| Absence periods | `/sidelined` with `player` or `players` | Not yet in `configs/config.yaml` |
-| Age and nationality | Player profile endpoint | To be chosen and verified |
+| Injuries per match | `/injuries` with `league` and `season` | No injury dates. Reasons include cards, suspensions and national team duty. Cross-check only |
+| Absence periods | `/sidelined` with `players`, at most 20 per request | Includes suspensions. Players without periods are omitted |
+| Age and nationality | `/players` with `league` and `season`, 20 players per page | The free plan returns at most 3 pages. Age is computed from the date of birth, as the `age` field is the current one |
 | Market value | [transfermarkt-datasets](https://github.com/dcaribou/transfermarkt-datasets): `player_valuations` and `players` | v2, see below |
 
 Observed on the free plan on 2026-11-27: Eredivisie 2023 `/injuries` returned 1769 rows for 297 players in one request. `/sidelined` accepted five players in one request. Match events have no ID of their own, so the details of a match must be replaced as a whole.
+
+### Source quality findings
+
+Checked on 2026-11-27 on the free plan, mostly on small samples.
+
+| Finding | Evidence |
+|---|---|
+| No `/injuries` data for Liga Portugal and the Belgian Pro League | 0 rows for 2023 and 2024, while EFL Championship returned 3698 and Eredivisie 1769 for 2023. The league coverage flag is off for 2021 to 2024 and 2026, and on for 2025 |
+| `/sidelined` agrees well with `/injuries` | For 20 often injured Eredivisie players, its periods cover 161 of 171 injury absences. One player had none of 6 covered |
+| `/sidelined` is still updated, unevenly across samples | For the 55 players of Ajax 2023 the newest period starts on 2026-10-28. In earlier samples of about 80 players nothing started after September 2025 |
+| Date of birth and nationality are filled | 80 of 80 players, 20 per league |
+| `passes.accuracy` is a number of accurate passes, not a percentage | Never above `passes.total` in 147 player matches |
+| `null` in counting statistics of a player who played means zero | Goals, assists, shots, key passes, tackles and dribbles hold no zeros, only `null`. Cards do use `0`. Checked on 4 Premier League matches |
+| `end: null` in `/sidelined` | 14 periods starting in 2024 and 2025, none followed by a newer period in these samples |
+| `/players` pages in 2023 | 59, 49, 43 and 37 for Championship, Eredivisie, Liga Portugal and Belgium |
 
 ### Market value source
 
@@ -167,12 +184,14 @@ Checked on 2026-11-27 on files dated 2026-09-05. `player_valuations` holds 65630
 
 To verify on data before the related fields are implemented:
 
-- Is `passes.accuracy` a percentage or a number of accurate passes? One sample suggests a number.
-- Does `null` in player statistics mean zero or missing data?
-- Are age, injuries and absence periods covered for all four leagues?
+- Does `null` in player statistics mean zero in the four tracked leagues too, and for every field?
+- Are date of birth and absence periods filled for all players, not only in samples?
+- How complete and how fresh is `/sidelined` for the ongoing season in each league?
 - How should `end: null` in `/sidelined` be treated? It also occurs in old records followed by newer ones.
-- Does `/sidelined` include suspensions, and how many players does one request accept?
+- Which `/sidelined` types count as injury or illness, for example `Unknown`?
+- Does `/players` list everyone who appears in match details?
 - Do `/injuries` suspension rows agree with the cards in match statistics?
+- Where do suspensions come from for leagues without `/injuries`?
 - Does the paid plan give access to the ongoing season?
 
 To decide:

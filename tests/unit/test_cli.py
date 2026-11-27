@@ -23,6 +23,11 @@ def run_cli(monkeypatch, args):
         "run_match_details_pipeline",
         lambda **kwargs: calls.append({"endpoint": "match_details", **kwargs}),
     )
+    monkeypatch.setattr(
+        cli,
+        "run_sidelined_pipeline",
+        lambda **kwargs: calls.append({"endpoint": "sidelined", **kwargs}),
+    )
     return CliRunner().invoke(cli.cli, args), calls
 
 
