@@ -77,6 +77,13 @@ api:
       allowed_params: ["id", "team", "league", "season"]
       s3_template: "raw/facts/players_statistics/league_id={league}/season={season}/date={snapshot_date}"
     
+    # Injury and suspension periods of the players of a players_statistics snapshot.
+    sidelined:
+      path: "/sidelined"
+      s3_template: "raw/facts/sidelined/league_id={league}/season={season}/date={snapshot_date}"
+      # Players per request, 20 at most.
+      batch_size: 20
+
     players_squads:
       path: "/players/squads"
       allowed_params: ["team"]
