@@ -1,6 +1,4 @@
-import os
 from datetime import UTC, datetime
-from pathlib import Path
 
 import click
 
@@ -80,14 +78,7 @@ def cli(
     """Entry point for the data ingestion pipeline."""
     setup_logger()
 
-    root_path = Path(__file__).resolve().parent.parent.parent
-    default_config_path = root_path / "configs" / "config.yaml"
-    default_env_path = root_path / ".env"
-
-    config_path = os.environ.get("PIPELINE_CONFIG_PATH", default_config_path)
-    env_path = os.environ.get("PIPELINE_ENV_PATH", default_env_path)
-
-    config = load_config(config_path, env_path)
+    config = load_config()
 
     endpoints = config["api"]["endpoints"]
     if endpoint not in endpoints:

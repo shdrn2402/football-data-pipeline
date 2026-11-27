@@ -4,6 +4,7 @@
 
 # Environments and secrets
 .env
+.env.*
 venv/
 .venv/
 env/
