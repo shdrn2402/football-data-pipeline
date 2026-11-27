@@ -105,59 +105,12 @@ def load_raw_snapshot(params: dict) -> None:
     logger.info("Loaded the S3 snapshot into raw_fixtures.")
 
 
-def check_raw_ids(params: dict) -> None:
-    """Fails if a fixture of the snapshot lacks an ID.
-
-    JSONExtractUInt returns 0 for a missing field, so a changed response format
-    would otherwise load silently. Runs before staging to keep broken rows out.
-
-    Raises:
-        ValueError: If a fixture or team ID is zero.
-    """
-    result = execute(
-        "SELECT countIf(fixture_id = 0), "
-        "countIf(JSONExtractUInt(payload, 'teams', 'home', 'id') = 0), "
-        "countIf(JSONExtractUInt(payload, 'teams', 'away', 'id') = 0) "
-        f"FROM raw_fixtures FINAL WHERE {SNAPSHOT_FILTER}",
-        params,
-    )
-    columns = ("fixture_id", "home_team_id", "away_team_id")
-    broken = {
-        column: int(count)
-        for column, count in zip(columns, result.split("\t"), strict=True)
-        if int(count)
-    }
-    if broken:
-        raise ValueError(
-            f"Rows with a zero ID in the raw snapshot: {broken}. "
-            "Check the API response format."
-        )
-
-
-def check_staging_coverage(params: dict) -> None:
-    """Fails if a fixture of the snapshot is absent from staging.
-
-    Raises:
-        ValueError: If any fixture did not reach stg_fixtures.
-    """
-    missing = int(
-        execute(
-            f"SELECT count() FROM raw_fixtures FINAL WHERE {SNAPSHOT_FILTER} "
-            "AND fixture_id NOT IN (SELECT fixture_id FROM stg_fixtures "
-            "WHERE league_id = {league_id:UInt32} AND season = {season:UInt16})",
-            params,
-        )
-    )
-    if missing:
-        raise ValueError(f"{missing} fixtures of the snapshot are missing in staging.")
-
-
 def load_fixtures(league_id: int, season: int, snapshot_date: str) -> None:
-    """Loads one fixtures snapshot from S3 into the raw and staging tables.
+    """Loads one fixtures snapshot from S3 into the raw table.
 
     Raises:
-        ValueError: If the snapshot holds no fixtures or fails a quality check,
-            to fail instead of staying green.
+        ValueError: If the snapshot holds no fixtures, to fail instead of staying
+            green. The other quality checks are dbt tests.
     """
     snapshot = {
         "league_id": league_id,
@@ -188,10 +141,6 @@ def load_fixtures(league_id: int, season: int, snapshot_date: str) -> None:
             f"No fixtures found in snapshot {params['s3_url']}. Check the extract step."
         )
     logger.info(f"Raw snapshot holds {loaded} fixtures.")
-    check_raw_ids(snapshot)
-
-    run_sql_file("load_stg_fixtures.sql", params)
-    check_staging_coverage(snapshot)
 
 
 def build_team_points(league_id: int, season: int) -> None:

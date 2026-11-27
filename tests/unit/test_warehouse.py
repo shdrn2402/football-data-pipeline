@@ -42,7 +42,7 @@ def test_build_fixtures_s3_url_matches_ingestion_key(monkeypatch, tmp_path, temp
 def test_read_statements_splits_create_tables():
     statements = clickhouse.read_statements("create_tables.sql")
 
-    assert len(statements) == 3
+    assert len(statements) == 2
     assert all("CREATE TABLE IF NOT EXISTS" in s for s in statements)
 
 
@@ -73,20 +73,12 @@ def test_load_raw_snapshot_sends_escaped_keys_outside_params(monkeypatch):
     assert captured["params"] == {"s3_url": "https://example/data.json"}
 
 
-def fake_warehouse(monkeypatch, zero_ids="0\t0\t0", missing="0"):
-    """Replaces ClickHouse and returns the log of executed steps."""
+def test_load_fixtures_cleans_unreplaceable_rows_before_loading(monkeypatch):
     steps = []
 
     def fake_execute(statement, params=None):
         if statement.startswith("DELETE"):
             steps.append("delete")
-            return ""
-        if "countIf" in statement:
-            steps.append("check ids")
-            return zero_ids
-        if "NOT IN" in statement:
-            steps.append("check coverage")
-            return missing
         return "380"
 
     monkeypatch.setenv("AWS_S3_LANDING_BUCKET_NAME", "test-bucket")
@@ -97,45 +89,7 @@ def fake_warehouse(monkeypatch, zero_ids="0\t0\t0", missing="0"):
     monkeypatch.setattr(
         clickhouse, "load_raw_snapshot", lambda params: steps.append("load raw")
     )
-    return steps
-
-
-def test_load_fixtures_checks_raw_before_staging_and_staging_after(monkeypatch):
-    steps = fake_warehouse(monkeypatch)
 
     clickhouse.load_fixtures(39, 2023, "2026-11-07")
 
-    assert steps == [
-        "create_tables.sql",
-        "delete",
-        "load raw",
-        "check ids",
-        "load_stg_fixtures.sql",
-        "check coverage",
-    ]
-
-
-@pytest.mark.parametrize(
-    ("zero_ids", "column"),
-    [
-        ("1\t0\t0", "fixture_id"),
-        ("0\t2\t0", "home_team_id"),
-        ("0\t0\t3", "away_team_id"),
-    ],
-)
-def test_load_fixtures_keeps_rows_with_a_zero_id_out_of_staging(
-    monkeypatch, zero_ids, column
-):
-    steps = fake_warehouse(monkeypatch, zero_ids=zero_ids)
-
-    with pytest.raises(ValueError, match=column):
-        clickhouse.load_fixtures(39, 2023, "2026-11-07")
-
-    assert "load_stg_fixtures.sql" not in steps
-
-
-def test_load_fixtures_fails_if_staging_misses_fixtures(monkeypatch):
-    fake_warehouse(monkeypatch, missing="2")
-
-    with pytest.raises(ValueError, match="2 fixtures of the snapshot are missing"):
-        clickhouse.load_fixtures(39, 2023, "2026-11-07")
+    assert steps == ["create_tables.sql", "delete", "load raw"]

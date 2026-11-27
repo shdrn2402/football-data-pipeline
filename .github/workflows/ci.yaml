@@ -8,6 +8,20 @@ on:
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
+    services:
+      clickhouse:
+        image: clickhouse/clickhouse-server:26.8
+        env:
+          CLICKHOUSE_USER: ci
+          CLICKHOUSE_PASSWORD: ci
+          CLICKHOUSE_DB: ci
+          CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+        ports:
+          - 8123:8123
+        options: >-
+          --health-cmd "wget --spider --quiet http://127.0.0.1:8123/ping"
+          --health-interval 5s
+          --health-retries 20
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -34,3 +48,11 @@ jobs:
 
       - name: Run unit tests
         run: uv run pytest tests/
+
+      - name: Run dbt models against ClickHouse
+        run: uv run pytest tests/integration
+        env:
+          RUN_INTEGRATION_TESTS: "1"
+          CLICKHOUSE_USER: ci
+          CLICKHOUSE_PASSWORD: ci
+          CLICKHOUSE_DB: ci

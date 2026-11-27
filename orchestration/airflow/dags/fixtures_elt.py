@@ -82,6 +82,18 @@ with DAG(
         f"--snapshot-date {SNAPSHOT_DATE}",
     )
 
+    build_staging_models = DockerOperator(
+        task_id="build_staging_models",
+        image="football-pipeline:latest",
+        api_version="auto",
+        auto_remove="force",
+        docker_url="unix://var/run/docker.sock",
+        network_mode="football_airflow",
+        environment=CLICKHOUSE_DOCKER_ENV,
+        command="/app/.venv/bin/football-warehouse build-staging --league-id {{ params.league_id }} --season {{ params.season }} "
+        f"--snapshot-date {SNAPSHOT_DATE}",
+    )
+
     build_team_points_mart = DockerOperator(
         task_id="build_team_points_mart",
         image="football-pipeline:latest",
@@ -93,4 +105,9 @@ with DAG(
         command="/app/.venv/bin/football-warehouse build-team-points --league-id {{ params.league_id }} --season {{ params.season }}",
     )
 
-    extract_fixtures >> load_fixtures_to_clickhouse >> build_team_points_mart
+    (
+        extract_fixtures
+        >> load_fixtures_to_clickhouse
+        >> build_staging_models
+        >> build_team_points_mart
+    )

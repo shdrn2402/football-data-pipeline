@@ -33,12 +33,14 @@ flowchart TD
     end
 
     subgraph Warehouse ["Data Warehouse (Airflow)"]
-        S3 -->|s3 table function| DWH[(ClickHouse: raw, staging, mart)]
+        S3 -->|s3 table function| Raw[(ClickHouse raw)]
+        Raw -->|dbt model and tests| Staging[(ClickHouse staging)]
+        Staging -->|SQL| Mart[(Team points mart)]
     end
 
     subgraph FutureScope ["Planned Analytics"]
-        DWH -.->|dbt Models| Marts[Fact & Dimension Tables]
-        Marts -.-> BI[Dashboards]
+        Staging -.->|dbt model| Scouting[Scouting mart]
+        Scouting -.-> BI[Dashboards]
     end
 ```
 
@@ -49,7 +51,7 @@ flowchart TD
 * **Infrastructure as Code (IaC):** AWS S3 landing bucket and scoped IAM ingestion policies managed via **Terraform** (AWS provider ~> 6.0) with remote state in S3 and native S3 state locking. Both buckets are versioned and cannot be destroyed while they hold objects.
 * **Resilient Ingestion Engine (`src/`):** Parameterized CLI built with `click` and `requests`. Features automated pagination, rate-limit sleep windows, dynamic S3 folder partitioning from per-endpoint templates (e.g. `league_id / season / date`), and structured logging.
 * **Orchestration Layer:** **Apache Airflow 3.3.2** and **Kestra 2.0** available as alternative Docker Compose stacks, each backed by its own PostgreSQL 18 metadata database for task execution.
-* **Local Data Warehouse:** **ClickHouse 26.8 LTS** included in each orchestration stack, with persistent volumes and a health check. The Airflow DAG `football_fixtures_elt` loads match results from S3 into raw and staging tables and builds a team points mart.
+* **Local Data Warehouse:** **ClickHouse 26.8 LTS** included in each orchestration stack, with persistent volumes and a health check. The Airflow DAG `football_fixtures_elt` loads match results from S3 into a raw table, builds staging with **dbt** and builds a team points mart.
 * **Secure & Fast Containerization:** Lightweight Docker images leveraging Astral `uv` for sub-second dependency resolution, running under an unprivileged user (`ingest_user`) for container security.
 
 ---
@@ -70,7 +72,7 @@ football-data-pipeline/
 │       ├── extractors/       # API-Sports extraction clients
 │       ├── services/         # Ingestion orchestration services
 │       ├── storage/          # S3 storage clients and uploaders
-│       └── warehouse/        # ClickHouse loading CLI and SQL models
+│       └── warehouse/        # ClickHouse loading CLI, SQL and the dbt project
 ├── terraform/                # IaC definitions (S3, IAM)
 ├── terraform-backend/        # IaC state bucket definition
 ├── tests/                    # Unit test suite
@@ -90,6 +92,7 @@ football-data-pipeline/
 | **Infrastructure as Code** | Terraform (AWS Provider ~> 6.0) |
 | **Orchestration** | Apache Airflow 3.3.2, Kestra 2.0, PostgreSQL 18 |
 | **Data Warehouse** | ClickHouse 26.8 LTS |
+| **Transformations** | dbt Core 1.12 with `dbt-clickhouse` |
 | **Containerization** | Docker, Docker Compose |
 
 ---
@@ -197,6 +200,7 @@ uv run football-pipeline --endpoint fixtures --league-id 39 --season 2023 --snap
 
 # Requires the ClickHouse service of a running stack (step 4)
 uv run football-warehouse load-fixtures --league-id 39 --season 2023 --snapshot-date 2026-11-08
+uv run football-warehouse build-staging --league-id 39 --season 2023 --snapshot-date 2026-11-08
 uv run football-warehouse build-team-points --league-id 39 --season 2023
 ```
 
@@ -219,11 +223,12 @@ docker run --rm --env-file .env.local football-pipeline:latest football-pipeline
 ```
 
 ### 6. Run the Fixtures ELT DAG
-Unpause and trigger `football_fixtures_elt` in the Airflow UI (parameters: `league_id`, `season`). It runs three tasks:
+Unpause and trigger `football_fixtures_elt` in the Airflow UI (parameters: `league_id`, `season`). It runs four tasks:
 
 1. `extract_fixtures`: API-Football to S3.
-2. `load_fixtures_to_clickhouse`: S3 to `raw_fixtures`, then `stg_fixtures`.
-3. `build_team_points_mart`: `stg_fixtures` to `mart_team_points`.
+2. `load_fixtures_to_clickhouse`: S3 to `raw_fixtures`.
+3. `build_staging_models`: dbt tests the raw snapshot, builds `stg_fixtures` and tests it.
+4. `build_team_points_mart`: `stg_fixtures` to `mart_team_points`.
 
 Check the result in the ClickHouse SQL UI. It connects to the `default` database, so qualify tables with your `CLICKHOUSE_DB` (`clickhouse` in `env.example`):
 ```sql
@@ -266,7 +271,9 @@ After the DAG ran twice, `stg_fixtures` physically held 760 rows, and `FINAL` re
 
 ![Deduplicated fixtures after a repeated DAG run](docs/screenshots/clickhouse_stg_fixtures_final.png)
 
-**Data quality checks.** `load_fixtures` fails the task if the snapshot is empty, if a fixture or team ID is zero (the response format changed, and such rows are stopped before staging), or if a fixture of the snapshot is missing in staging.
+**Transformations.** `raw_fixtures` is created and loaded by Python. Staging is built and owned by dbt (`src/football_pipeline/warehouse/dbt`): `stg_fixtures` is an incremental model that appends one snapshot per run. It ignores `--full-refresh`, as rebuilding it from one snapshot would drop all other seasons.
+
+**Data quality checks.** The load fails if the snapshot is empty. `dbt build` runs two tests: the first checks the raw snapshot for zero fixture or team IDs (the response format changed) and, on failure, skips the model, so such rows never reach staging; the second checks that every fixture of the snapshot reached staging. CI runs the models and both outcomes against a real ClickHouse.
 
 **Known limitation.** `mart_team_points` counts points from match results only. Points deductions are not in the fixtures data, so a sanctioned team shows more points than the official table.
 
@@ -296,5 +303,6 @@ API-Football is a live source with gaps. These findings are **preliminary**: the
 - [ ] Scheduled daily batch ingestion flows for facts
 - [x] Local ClickHouse deployment via Docker Compose
 - [x] Batch loading from S3 into ClickHouse (fixtures, Airflow)
-- [ ] Data modeling and staging layer with dbt
+- [x] Fixtures staging built with dbt, with data tests
+- [ ] Player match staging and scouting mart with dbt
 - [ ] Interactive analytical dashboard (Metabase or Superset)
