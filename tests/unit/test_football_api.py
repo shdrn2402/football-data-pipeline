@@ -173,3 +173,58 @@ def test_permanent_failure_is_not_retried(monkeypatch, response, error):
         fetch_with_retries()
 
     assert waits == []
+
+
+def test_fetch_data_requests_each_page_with_a_pause_between(monkeypatch):
+    pages = iter([make_page([n], n, 3) for n in (1, 2, 3)])
+    events = []
+
+    def fake_get(url, headers, params, timeout):
+        events.append(("get", dict(params)))
+        return FakeResponse(next(pages))
+
+    monkeypatch.setattr(football_api.requests, "get", fake_get)
+    monkeypatch.setattr(
+        football_api.time, "sleep", lambda seconds: events.append(("sleep", seconds))
+    )
+
+    football_api.fetch_data(
+        url="https://api.test",
+        headers={},
+        timeout=(1, 1),
+        query_params={"league": 88},
+        delay_seconds=7,
+    )
+
+    # No "page" on the first request and no pause after the last one.
+    assert events == [
+        ("get", {"league": 88}),
+        ("sleep", 7),
+        ("get", {"league": 88, "page": 2}),
+        ("sleep", 7),
+        ("get", {"league": 88, "page": 3}),
+    ]
+
+
+@pytest.mark.parametrize(
+    "errors",
+    [
+        pytest.param({"token": "Missing application key."}, id="dict"),
+        pytest.param(["Something went wrong."], id="list"),
+    ],
+)
+def test_fetch_data_fails_on_any_api_error(monkeypatch, errors):
+    fake_pages(monkeypatch, [make_page([], 1, 1, errors)])
+
+    with pytest.raises(ValueError, match="API returned errors on page 1"):
+        fetch()
+
+
+def test_fetch_data_wraps_object_response_in_a_list(monkeypatch):
+    team_statistics = {"team": {"id": 200}, "form": "WDL"}
+    fake_pages(monkeypatch, [make_page(team_statistics, 1, 1)])
+
+    payload = fetch()
+
+    assert payload["response"] == [team_statistics]
+    assert payload["results"] == 1
