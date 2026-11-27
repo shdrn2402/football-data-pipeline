@@ -272,6 +272,20 @@ After the DAG ran twice, `stg_fixtures` physically held 760 rows, and `FINAL` re
 
 ---
 
+## 🔍 Source Data Limitations
+
+API-Football is a live source with gaps. These were measured on the free plan, mostly for the 2023 season, and they shape the planned scouting mart ([specification](docs/scouting_mart_spec.md)).
+
+| Finding | Decision |
+|---|---|
+| `/injuries` returned no rows for Liga Portugal and the Belgian Pro League (2023 and 2024) | Injury availability comes from `/sidelined` for all four leagues, so players stay comparable |
+| `/sidelined` covered 161 of 171 injury absences of 20 often injured Eredivisie players | Good enough as that single source; `/injuries` cross-checks it where it exists |
+| `/sidelined` covered only 20 of 113 suspension absences in Eredivisie (18%) and 12 of 110 in EFL Championship (11%) | Suspended matches are counted from `/injuries` only and stay `NULL` elsewhere. Using the gaps would make players of two leagues look more disciplined. Deriving them from cards would need the rules of each league and cup matches that are not loaded. Cards per 90 minutes still measure discipline everywhere |
+| `passes.accuracy` holds the number of accurate passes, not a percentage | The percentage is computed from it and `passes.total` |
+| The `age` field of a player is the current age, even for a past season | Age is computed from the date of birth |
+
+---
+
 ## 📌 Project Roadmap
 
 - [x] Cloud infrastructure as code with Terraform (S3, IAM, S3 remote state with locking)
