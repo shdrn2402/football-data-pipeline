@@ -4,7 +4,11 @@ from pydantic import ValidationError
 
 from football_pipeline.domain.schemas import DataEnvelope, Metadata
 from football_pipeline.extractors.football_api import fetch_data
-from football_pipeline.storage.s3 import build_s3_key, upload_to_s3
+from football_pipeline.storage.s3 import (
+    add_filter_partitions,
+    build_s3_key,
+    upload_to_s3,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +36,9 @@ def run_ingestion_pipeline(
             - h2h (str): Hyphen-separated team IDs for head-to-head statistics.
 
     Raises:
-        ValueError: If the API response is empty and the endpoint does not allow it.
+        KeyError: If a value required by the S3 key template is missing.
+        ValueError: If a required filter is missing, or the API response is empty
+            and the endpoint does not allow it.
         ValidationError: If the API response fails Pydantic schema validation.
         Exception: Propagates network errors from fetch_data or Boto3 S3 upload errors.
     """
@@ -74,6 +80,19 @@ def run_ingestion_pipeline(
         if all_args.get(key) is not None
     }
 
+    require_any = endpoint_config.get("require_any")
+    if require_any and not any(param in query_params for param in require_any):
+        raise ValueError(f"Endpoint '{endpoint}' needs one of: {require_any}.")
+
+    # Built before the request, so a missing value fails without spending API quota.
+    s3_key = build_s3_key(
+        template_string=add_filter_partitions(
+            endpoint_config["s3_template"], query_params
+        ),
+        target_date=target_date,
+        **all_args,
+    )
+
     raw_data = fetch_data(
         url=url,
         headers=headers,
@@ -104,12 +123,6 @@ def run_ingestion_pipeline(
         raise
 
     bucket_name = config["aws_s3_landing_bucket"]
-    s3_key = build_s3_key(
-        template_string=endpoint_config["s3_template"],
-        target_date=target_date,
-        **all_args,
-    )
-
     upload_to_s3(validated_dict, bucket_name, s3_key)
     logger.info(
         f"Data successfully uploaded to S3 bucket '{bucket_name}' at '{s3_key}'."
