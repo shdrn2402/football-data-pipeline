@@ -50,7 +50,7 @@ ELT pipeline: API-Sports (API-Football v3) → S3 landing zone (raw JSON) → Cl
 - `create_tables.sql` is idempotent and runs before each load/build.
 - AWS keys for the `s3()` table function are substituted into SQL as escaped literals (`__AWS_ACCESS_KEY_ID__` placeholders), deliberately not as query params, so they're masked in ClickHouse logs.
 - `build_fixtures_s3_url` builds the object key from the `fixtures` `s3_template`, so the S3 layout is defined only in `configs/config.yaml`. The warehouse reads it with `read_config()`, which needs no secrets. A test compares the URL with the key ingestion writes.
-- `load_fixtures` raises if the snapshot loaded 0 rows, so an empty extract fails the DAG instead of staying green.
+- `load_fixtures` raises, so the DAG fails instead of staying green, if the snapshot loaded 0 rows, a fixture or team ID is 0 (checked on raw before staging), or a fixture of the snapshot is missing in staging. It deletes raw rows with `fixture_id = 0` of the snapshot before loading, so a re-run is not blocked by them.
 - Data model: `raw_fixtures` and `stg_fixtures` are `ReplacingMergeTree(ingested_at)` partitioned by `(league_id, season)` — always read them with `FINAL`. `ORDER BY` is the dedup key (raw: per snapshot; stg: per match). Don't partition by match date (rescheduled matches would duplicate across partitions). `mart_team_points` is a plain `MergeTree` rebuilt per league/season. See README "ClickHouse Data Model" for rationale.
 
 **Orchestration** — Airflow (`orchestration/airflow/dags/`) and Kestra (`orchestration/kestra/flows/`) are alternative stacks; both only launch the `football-pipeline:latest` container (Airflow via `DockerOperator` over the mounted docker socket). No business logic lives in DAGs.

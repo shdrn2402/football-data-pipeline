@@ -253,6 +253,8 @@ After the DAG ran twice, `stg_fixtures` physically held 760 rows, and `FINAL` re
 
 ![Deduplicated fixtures after a repeated DAG run](docs/screenshots/clickhouse_stg_fixtures_final.png)
 
+**Data quality checks.** `load_fixtures` fails the task if the snapshot is empty, if a fixture or team ID is zero (the response format changed, and such rows are stopped before staging), or if a fixture of the snapshot is missing in staging.
+
 **Known limitation.** `mart_team_points` counts points from match results only. Points deductions are not in the fixtures data, so a sanctioned team shows more points than the official table.
 
 ---

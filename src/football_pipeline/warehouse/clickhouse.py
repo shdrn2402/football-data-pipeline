@@ -11,6 +11,11 @@ logger = logging.getLogger(__name__)
 
 SQL_DIR = Path(__file__).parent / "sql"
 REQUEST_TIMEOUT_SECONDS = (10, 300)
+# Selects the raw rows of one snapshot.
+SNAPSHOT_FILTER = (
+    "league_id = {league_id:UInt32} AND season = {season:UInt16} "
+    "AND snapshot_date = {target_date:Date}"
+)
 
 
 def read_statements(file_name: str) -> list[str]:
@@ -100,27 +105,78 @@ def load_raw_snapshot(params: dict) -> None:
     logger.info("Loaded the S3 snapshot into raw_fixtures.")
 
 
+def check_raw_ids(params: dict) -> None:
+    """Fails if a fixture of the snapshot lacks an ID.
+
+    JSONExtractUInt returns 0 for a missing field, so a changed response format
+    would otherwise load silently. Runs before staging to keep broken rows out.
+
+    Raises:
+        ValueError: If a fixture or team ID is zero.
+    """
+    result = execute(
+        "SELECT countIf(fixture_id = 0), "
+        "countIf(JSONExtractUInt(payload, 'teams', 'home', 'id') = 0), "
+        "countIf(JSONExtractUInt(payload, 'teams', 'away', 'id') = 0) "
+        f"FROM raw_fixtures FINAL WHERE {SNAPSHOT_FILTER}",
+        params,
+    )
+    columns = ("fixture_id", "home_team_id", "away_team_id")
+    broken = {
+        column: int(count)
+        for column, count in zip(columns, result.split("\t"), strict=True)
+        if int(count)
+    }
+    if broken:
+        raise ValueError(
+            f"Rows with a zero ID in the raw snapshot: {broken}. "
+            "Check the API response format."
+        )
+
+
+def check_staging_coverage(params: dict) -> None:
+    """Fails if a fixture of the snapshot is absent from staging.
+
+    Raises:
+        ValueError: If any fixture did not reach stg_fixtures.
+    """
+    missing = int(
+        execute(
+            f"SELECT count() FROM raw_fixtures FINAL WHERE {SNAPSHOT_FILTER} "
+            "AND fixture_id NOT IN (SELECT fixture_id FROM stg_fixtures "
+            "WHERE league_id = {league_id:UInt32} AND season = {season:UInt16})",
+            params,
+        )
+    )
+    if missing:
+        raise ValueError(f"{missing} fixtures of the snapshot are missing in staging.")
+
+
 def load_fixtures(league_id: int, season: int, target_date: str) -> None:
     """Loads one fixtures snapshot from S3 into the raw and staging tables.
 
     Raises:
-        ValueError: If the snapshot holds no fixtures, to fail instead of staying green.
+        ValueError: If the snapshot holds no fixtures or fails a quality check,
+            to fail instead of staying green.
     """
+    snapshot = {"league_id": league_id, "season": season, "target_date": target_date}
     params = {
-        "league_id": league_id,
-        "season": season,
-        "target_date": target_date,
+        **snapshot,
         "s3_url": build_fixtures_s3_url(league_id, season, target_date),
     }
     run_sql_file("create_tables.sql")
+    # A row without a fixture ID is never replaced by a corrected one, so a row
+    # left by a failed load would fail every later run of the same snapshot.
+    execute(
+        f"DELETE FROM raw_fixtures WHERE {SNAPSHOT_FILTER} AND fixture_id = 0",
+        snapshot,
+    )
     load_raw_snapshot(params)
 
     loaded = int(
         execute(
-            "SELECT count() FROM raw_fixtures FINAL "
-            "WHERE league_id = {league_id:UInt32} AND season = {season:UInt16} "
-            "AND snapshot_date = {target_date:Date}",
-            {"league_id": league_id, "season": season, "target_date": target_date},
+            f"SELECT count() FROM raw_fixtures FINAL WHERE {SNAPSHOT_FILTER}",
+            snapshot,
         )
     )
     if loaded == 0:
@@ -128,8 +184,10 @@ def load_fixtures(league_id: int, season: int, target_date: str) -> None:
             f"No fixtures found in snapshot {params['s3_url']}. Check the extract step."
         )
     logger.info(f"Raw snapshot holds {loaded} fixtures.")
+    check_raw_ids(snapshot)
 
     run_sql_file("load_stg_fixtures.sql", params)
+    check_staging_coverage(snapshot)
 
 
 def build_team_points(league_id: int, season: int) -> None:
