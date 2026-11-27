@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 def run_ingestion_pipeline(
-    endpoint: str, target_date: str, config: dict, **kwargs
+    endpoint: str, snapshot_date: str, config: dict, **kwargs
 ) -> None:
     """
     Executes the end-to-end data ingestion process for a specific API endpoint.
@@ -24,7 +24,7 @@ def run_ingestion_pipeline(
 
     Args:
         endpoint (str): The target API endpoint name (e.g., "leagues", "fixtures").
-        target_date (str): Logical execution date in "YYYY-MM-DD" format.
+        snapshot_date (str): Date of the extraction snapshot, "YYYY-MM-DD".
         config (dict): Application configuration dictionary containing API credentials,
             endpoints metadata, and AWS settings.
         **kwargs: Optional query parameters for API filtering. Supported keys include:
@@ -59,7 +59,7 @@ def run_ingestion_pipeline(
     target_entity_id = player_id if endpoint == "players_statistics" else league_id
 
     all_args = {
-        "date": target_date,
+        "date": snapshot_date,
         "fixture": kwargs.get("fixture_id"),
         "h2h": kwargs.get("h2h"),
         "id": target_entity_id,
@@ -84,7 +84,7 @@ def run_ingestion_pipeline(
         template_string=add_filter_partitions(
             endpoint_config["s3_template"], query_params
         ),
-        target_date=target_date,
+        snapshot_date=snapshot_date,
         **all_args,
     )
 
@@ -110,7 +110,7 @@ def run_ingestion_pipeline(
             _metadata=Metadata(
                 endpoint=endpoint,
                 params=query_params,
-                target_date=target_date,
+                snapshot_date=snapshot_date,
             ),
             payload=raw_data,
         )

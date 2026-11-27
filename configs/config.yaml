@@ -18,27 +18,27 @@ api:
     teams_statistics:
       path: "/teams/statistics"
       allowed_params: ["league", "season", "team", "date"]
-      s3_template: "raw/facts/teams_statistics/league_id={league}/season={season}/team_id={team}/date={target_date}"
+      s3_template: "raw/facts/teams_statistics/league_id={league}/season={season}/team_id={team}/date={snapshot_date}"
 
     standings:
       path: "/standings"
       allowed_params: ["league", "season", "team"]
-      s3_template: "raw/facts/standings/league_id={league}/season={season}/date={target_date}"
+      s3_template: "raw/facts/standings/league_id={league}/season={season}/date={snapshot_date}"
 
     fixtures:
       path: "/fixtures"
       allowed_params: ["league", "season", "team"]
-      s3_template: "raw/facts/fixtures/league_id={league}/season={season}/date={target_date}"
+      s3_template: "raw/facts/fixtures/league_id={league}/season={season}/date={snapshot_date}"
 
     fixtures_rounds:
       path: "/fixtures/rounds"
       allowed_params: ["league", "season"]
-      s3_template: "raw/facts/fixtures_rounds/league_id={league}/season={season}/date={target_date}"
+      s3_template: "raw/facts/fixtures_rounds/league_id={league}/season={season}/date={snapshot_date}"
 
     fixtures_head_to_head:
       path: "/fixtures/headtohead"
       allowed_params: ["h2h", "league", "season"]
-      s3_template: "raw/facts/fixtures_head_to_head/h2h={h2h}/date={target_date}"
+      s3_template: "raw/facts/fixtures_head_to_head/h2h={h2h}/date={snapshot_date}"
       allow_empty: true
 
     fixtures_statistics:
@@ -75,23 +75,23 @@ api:
     players_statistics:
       path: "/players"
       allowed_params: ["id", "team", "league", "season"]
-      s3_template: "raw/facts/players_statistics/league_id={league}/season={season}/date={target_date}"
+      s3_template: "raw/facts/players_statistics/league_id={league}/season={season}/date={snapshot_date}"
     
     players_squads:
       path: "/players/squads"
       allowed_params: ["team"]
-      s3_template: "raw/facts/players_squads/team_id={team}/date={target_date}"
+      s3_template: "raw/facts/players_squads/team_id={team}/date={snapshot_date}"
     
     injuries:
       path: "/injuries"
       allowed_params: ["league", "season", "fixture", "team", "player"]
-      s3_template: "raw/facts/injuries/league_id={league}/season={season}/date={target_date}"
+      s3_template: "raw/facts/injuries/league_id={league}/season={season}/date={snapshot_date}"
       allow_empty: true
 
     transfers:
       path: "/transfers"
       allowed_params: ["team", "player"]
-      s3_template: "raw/facts/transfers/date={target_date}"
+      s3_template: "raw/facts/transfers/date={snapshot_date}"
       require_any: ["team", "player"]
       allow_empty: true
 

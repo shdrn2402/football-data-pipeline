@@ -18,8 +18,8 @@ Single test: `uv run pytest tests/unit/test_warehouse.py::test_load_fixtures_fai
 Two console scripts (defined in `pyproject.toml`):
 
 ```bash
-uv run football-pipeline --endpoint fixtures --league-id 39 --season 2023 --target-date 2026-11-08   # API -> S3
-uv run football-warehouse load-fixtures --league-id 39 --season 2023 --target-date 2026-11-08        # S3 -> ClickHouse raw/stg
+uv run football-pipeline --endpoint fixtures --league-id 39 --season 2023 --snapshot-date 2026-11-08   # API -> S3
+uv run football-warehouse load-fixtures --league-id 39 --season 2023 --snapshot-date 2026-11-08        # S3 -> ClickHouse raw/stg
 uv run football-warehouse build-team-points --league-id 39 --season 2023                             # stg -> mart
 ```
 
@@ -37,13 +37,13 @@ ELT pipeline: API-Sports (API-Football v3) → S3 landing zone (raw JSON) → Cl
 
 **Ingestion (`football-pipeline`)** — `cli.py` → `services/ingestion.py` → `extractors/football_api.py` (pagination, rate-limit sleep) → `domain/schemas.py` → `storage/s3.py`.
 - Endpoints are data-driven by `configs/config.yaml`: each entry has `path`, `allowed_params` (whitelist of query params actually sent) and `s3_template` (S3 key layout). The CLI takes the endpoint names from the config, so adding an endpoint means adding a config entry. `allowed_params` may only list parameters that `ingestion.py` can build (covered by a test).
-- `match_details` has its own service (`services/match_details.py`): it takes finished matches from the `fixtures` snapshot of `--target-date`, skips matches already in S3 (needs `s3:ListBucket`), and writes one object per match regardless of `batch_size` (1 sends `id`, more sends `ids`).
-- `date=target_date` is sent to the API only where it matches snapshot semantics (`teams_statistics`). The CLI has no default league or season.
+- `match_details` has its own service (`services/match_details.py`): it takes finished matches from the `fixtures` snapshot of `--snapshot-date`, skips matches already in S3 (needs `s3:ListBucket`), and writes one object per match regardless of `batch_size` (1 sends `id`, more sends `ids`).
+- `date=snapshot_date` is sent to the API only where it matches snapshot semantics (`teams_statistics`). The CLI has no default league or season.
 - Filters (`league`, `season`, `team`, `player`, `fixture`) missing from `s3_template` are added to the S3 key (`add_filter_partitions`), so a filtered run never overwrites a full snapshot. A missing template value fails before the API call.
 - `request_page` retries network errors, 429, 5xx and `errors.rateLimit` with backoff, but not when the daily quota is exhausted. Limits are in `api.limits`; `API_DELAY_SECONDS` overrides the request pause (Airflow variable `api_delay_seconds`).
 - An empty API response fails the run before the upload, unless the endpoint sets `allow_empty: true`.
 - `ingestion.py` builds a superset of args, then filters by `allowed_params`. E.g. `fixtures` does not allow `date`, so it always fetches the whole season.
-- Every S3 object is a `DataEnvelope`: `{"_metadata": {ingested_at, source, endpoint, params, target_date}, "payload": <raw API response>}`, written to `<s3_template>/data.json`.
+- Every S3 object is a `DataEnvelope`: `{"_metadata": {ingested_at, source, endpoint, params, snapshot_date}, "payload": <raw API response>}`, written to `<s3_template>/data.json`. Objects written before the rename in #62 hold the snapshot date under an older metadata key; nothing reads it.
 - `date=` in S3 paths is the **snapshot (extraction) date**, not the match date; all snapshots are kept.
 
 **Warehouse (`football-warehouse`)** — `warehouse/clickhouse.py` talks to ClickHouse over the HTTP interface with plain `requests` (no driver).
@@ -55,7 +55,7 @@ ELT pipeline: API-Sports (API-Football v3) → S3 landing zone (raw JSON) → Cl
 - Data model: `raw_fixtures` and `stg_fixtures` are `ReplacingMergeTree(ingested_at)` partitioned by `(league_id, season)` — always read them with `FINAL`. `ORDER BY` is the dedup key (raw: per snapshot; stg: per match). Don't partition by match date (rescheduled matches would duplicate across partitions). `mart_team_points` is a plain `MergeTree` rebuilt per league/season. See README "ClickHouse Data Model" for rationale.
 
 **Orchestration** — Airflow (`orchestration/airflow/dags/`) and Kestra (`orchestration/kestra/flows/`) are alternative stacks; both only launch the `football-pipeline:latest` container (Airflow via `DockerOperator` over the mounted docker socket). No business logic lives in DAGs.
-- `football_fixtures_elt` (Airflow only, `schedule=None`): extract → load → mart. Extract and load must share `TARGET_DATE` (`dag_run.run_after`) to address the same snapshot.
+- `football_fixtures_elt` (Airflow only, `schedule=None`): extract → load → mart. Extract and load must share `SNAPSHOT_DATE` (`dag_run.run_after`) to address the same snapshot.
 - Warehouse tasks join the fixed Docker network `football_airflow` to reach the `clickhouse` service; the extract task uses `bridge`.
 - `football_bootstrap_dimensions` exists in both Airflow and Kestra (leagues, teams).
 

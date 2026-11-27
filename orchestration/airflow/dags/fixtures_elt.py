@@ -35,7 +35,7 @@ CLICKHOUSE_DOCKER_ENV = {
 }
 
 # Both the extract and load tasks must address the same S3 snapshot.
-TARGET_DATE = "{{ dag_run.run_after.strftime('%Y-%m-%d') }}"
+SNAPSHOT_DATE = "{{ dag_run.run_after.strftime('%Y-%m-%d') }}"
 
 with DAG(
     dag_id="football_fixtures_elt",
@@ -67,7 +67,7 @@ with DAG(
         network_mode="bridge",
         environment=SHARED_DOCKER_ENV,
         command="/app/.venv/bin/football-pipeline --endpoint fixtures --league-id {{ params.league_id }} --season {{ params.season }} "
-        f"--target-date {TARGET_DATE}",
+        f"--snapshot-date {SNAPSHOT_DATE}",
     )
 
     load_fixtures_to_clickhouse = DockerOperator(
@@ -79,7 +79,7 @@ with DAG(
         network_mode="football_airflow",
         environment=CLICKHOUSE_DOCKER_ENV,
         command="/app/.venv/bin/football-warehouse load-fixtures --league-id {{ params.league_id }} --season {{ params.season }} "
-        f"--target-date {TARGET_DATE}",
+        f"--snapshot-date {SNAPSHOT_DATE}",
     )
 
     build_team_points_mart = DockerOperator(

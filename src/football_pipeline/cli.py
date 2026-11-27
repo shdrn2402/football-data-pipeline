@@ -70,11 +70,11 @@ from football_pipeline.services.match_details import run_match_details_pipeline
     help="match_details only: matches to download in this run. Default is from config.yaml.",
 )
 @click.option(
-    "--target-date",
+    "--snapshot-date",
     default=datetime.now(UTC).strftime("%Y-%m-%d"),
     type=str,
-    envvar="INGEST_TARGET_DATE",
-    help="Specify the logical date for the data ingestion process. Default is current UTC date.",
+    envvar="INGEST_SNAPSHOT_DATE",
+    help="Date of the extraction snapshot, not of the matches. Default is current UTC date.",
 )
 def cli(
     endpoint: str,
@@ -85,7 +85,7 @@ def cli(
     fixture_id: int | None,
     player_id: int | None,
     max_fixtures: int | None,
-    target_date: str,
+    snapshot_date: str,
 ) -> None:
     """Entry point for the data ingestion pipeline."""
     setup_logger()
@@ -102,7 +102,7 @@ def cli(
     if endpoint == MATCH_DETAILS:
         run_match_details_pipeline(
             config=config,
-            target_date=target_date,
+            snapshot_date=snapshot_date,
             league_id=league_id,
             season=season,
             fixture_id=fixture_id,
@@ -112,7 +112,7 @@ def cli(
 
     run_ingestion_pipeline(
         endpoint=endpoint,
-        target_date=target_date,
+        snapshot_date=snapshot_date,
         config=config,
         league_id=league_id,
         season=season,
