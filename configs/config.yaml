@@ -80,7 +80,8 @@ api:
     transfers:
       path: "/transfers"
       allowed_params: ["team", "player"]
-      s3_template: "raw/facts/transfers/team_id={team}/date={target_date}"
+      s3_template: "raw/facts/transfers/date={target_date}"
+      require_any: ["team", "player"]
       allow_empty: true
 
   headers:
