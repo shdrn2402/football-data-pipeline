@@ -26,7 +26,8 @@ def fetch_data(
     Raises:
         requests.exceptions.HTTPError: If the HTTP request returns an unsuccessful status code.
         requests.exceptions.RequestException: For underlying network issues.
-        ValueError: If the API response contains business logic errors despite a 200 OK status.
+        ValueError: If any page contains API errors, including plan limitations,
+            despite a 200 OK status.
 
     Returns:
         dict: Consolidated JSON payload containing all items in the 'response' array/object.
@@ -50,17 +51,12 @@ def fetch_data(
             response.raise_for_status()
             data = response.json()
 
+            # Plan limitations arrive here too (HTTP 200, empty response). They
+            # must fail the run: a partial result would be stored as a complete one.
             if data.get("errors"):
-                errors = data["errors"]
-                # Gracefully handle API plan limitations (e.g., Free tier max pages)
-                if isinstance(errors, dict) and "plan" in errors:
-                    logger.warning(
-                        f"API plan limitation reached on page {current_page}. "
-                        f"Stopping pagination. Reason: {errors['plan']}"
-                    )
-                    break
-                # Raise exception for any other API errors
-                raise ValueError(f"API returned errors: {errors}")
+                raise ValueError(
+                    f"API returned errors on page {current_page}: {data['errors']}"
+                )
 
             # Initialize the payload structure and determine total pages on the first request
             if current_page == 1:
