@@ -49,7 +49,7 @@ ELT pipeline: API-Sports (API-Football v3) → S3 landing zone (raw JSON) → Cl
 - SQL lives in `warehouse/sql/*.sql`, split on `;` (one statement per HTTP request). Parameters use ClickHouse `{name:Type}` syntax and are sent as `param_<name>`; `run_sql_file` passes only params a statement references.
 - `create_tables.sql` is idempotent and runs before each load/build.
 - AWS keys for the `s3()` table function are substituted into SQL as escaped literals (`__AWS_ACCESS_KEY_ID__` placeholders), deliberately not as query params, so they're masked in ClickHouse logs.
-- `build_fixtures_s3_url` must stay in sync with the `fixtures` `s3_template` (covered by a test).
+- `build_fixtures_s3_url` builds the object key from the `fixtures` `s3_template`, so the S3 layout is defined only in `configs/config.yaml`. The warehouse reads it with `read_config()`, which needs no secrets. A test compares the URL with the key ingestion writes.
 - `load_fixtures` raises if the snapshot loaded 0 rows, so an empty extract fails the DAG instead of staying green.
 - Data model: `raw_fixtures` and `stg_fixtures` are `ReplacingMergeTree(ingested_at)` partitioned by `(league_id, season)` — always read them with `FINAL`. `ORDER BY` is the dedup key (raw: per snapshot; stg: per match). Don't partition by match date (rescheduled matches would duplicate across partitions). `mart_team_points` is a plain `MergeTree` rebuilt per league/season. See README "ClickHouse Data Model" for rationale.
 
