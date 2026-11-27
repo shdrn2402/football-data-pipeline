@@ -274,7 +274,7 @@ After the DAG ran twice, `stg_fixtures` physically held 760 rows, and `FINAL` re
 
 ## 🔍 Source Data Limitations
 
-API-Football is a live source with gaps. These were measured on the free plan, mostly for the 2023 season, and they shape the planned scouting mart ([specification](docs/scouting_mart_spec.md)).
+API-Football is a live source with gaps. These findings are **preliminary**: they were measured on the free plan, mostly on samples from the 2023 season. They will be re-checked on the full data loaded with a paid plan, and the decisions below may change. They shape the planned scouting mart ([specification](docs/scouting_mart_spec.md)).
 
 | Finding | Decision |
 |---|---|

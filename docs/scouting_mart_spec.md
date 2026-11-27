@@ -194,6 +194,7 @@ To verify on data before the related fields are implemented:
 - Does `/players` list everyone who appears in match details?
 - Do `/injuries` suspension rows agree with the cards in match statistics?
 - Does the paid plan give access to the ongoing season?
+- After the paid load, what is the coverage of `/injuries` and `/sidelined`, including suspensions, for all tracked leagues and seasons?
 
 To decide:
 
