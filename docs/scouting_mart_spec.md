@@ -20,6 +20,8 @@ Player statistics are the core. Match results are secondary context. Screening a
 | Staging | player and match | All match statistics with club and league |
 | `dm_scouting_efficiency` | `(player_id, season)` | One row per player and season for screening |
 
+Staging and the mart are dbt models on ClickHouse; loading raw data from S3 is done in Python.
+
 The mart is the only Gold table. Any split by club or league is built from staging.
 
 A season is identified by its start year. The mart is rebuilt per season across all tracked leagues.
