@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from airflow.providers.docker.operators.docker import DockerOperator
 from airflow.sdk import DAG, Param
@@ -11,7 +11,15 @@ SHARED_DOCKER_ENV = {
     "AWS_DEFAULT_REGION": "{{ conn.aws_s3_conn.extra_dejson.get('region_name', 'eu-central-1') }}",
     "AWS_S3_LANDING_BUCKET_NAME": "{{ var.value.landing_bucket_name }}",
     "API_FOOTBALL_KEY": "{{ conn.api_football_conn.password }}",
+    "API_DELAY_SECONDS": "{{ var.value.get('api_delay_seconds', '') }}",
     "UV_NO_CACHE": "1",
+}
+
+# Covers failures outside the request retries, such as S3 or the Docker daemon.
+DEFAULT_ARGS = {
+    "retries": 2,
+    "retry_delay": timedelta(minutes=2),
+    "execution_timeout": timedelta(minutes=30),
 }
 
 CLICKHOUSE_DOCKER_ENV = {
@@ -35,6 +43,7 @@ with DAG(
     schedule=None,
     start_date=datetime(2026, 10, 1, tzinfo=UTC),
     catchup=False,
+    default_args=DEFAULT_ARGS,
     tags=["football", "fact", "fixtures"],
     params={
         "league_id": Param(

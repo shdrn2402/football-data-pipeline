@@ -25,6 +25,7 @@ x-airflow-common: &airflow-common
     AIRFLOW_CONN_API_FOOTBALL_CONN: '{"conn_type": "generic", "password": "${FLOW_API_FOOTBALL_KEY}"}'
     AIRFLOW_CONN_CLICKHOUSE_CONN: '{"conn_type": "generic", "host": "clickhouse", "port": 8123, "login": "${CLICKHOUSE_USER}", "password": "${CLICKHOUSE_PASSWORD}", "schema": "${CLICKHOUSE_DB}"}'
     AIRFLOW_VAR_LANDING_BUCKET_NAME: ${AWS_S3_LANDING_BUCKET_NAME}
+    AIRFLOW_VAR_API_DELAY_SECONDS: ${API_DELAY_SECONDS:-}
   group_add:
     - "${AIRFLOW_DOCKER_GID:-999}"
   volumes:

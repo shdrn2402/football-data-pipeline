@@ -87,6 +87,11 @@ api:
   headers:
     key_name: "x-apisports-key"
   limits:
+    # Pause between requests: 7 s fits the free plan (10 per minute).
+    # Override with API_DELAY_SECONDS for a paid plan.
     delay_seconds: 7
+    # Temporary failures are retried after 15, 30 and 60 seconds.
+    max_retries: 3
+    retry_delay_seconds: 15
     timeout_connect: 10
     timeout_read: 30

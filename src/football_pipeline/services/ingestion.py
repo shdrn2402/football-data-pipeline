@@ -94,6 +94,8 @@ def run_ingestion_pipeline(
         timeout=timeout,
         query_params=query_params,
         delay_seconds=delay_seconds,
+        max_retries=config["api"]["limits"]["max_retries"],
+        retry_delay_seconds=config["api"]["limits"]["retry_delay_seconds"],
     )
 
     # The key of a re-run is the same, so an empty payload would replace good data.
