@@ -1,19 +1,28 @@
 import json
 import logging
 import os
+import subprocess
+import sys
 import tempfile
 from pathlib import Path
-
-from dbt.cli.main import dbtRunner
 
 logger = logging.getLogger(__name__)
 
 DBT_DIR = Path(__file__).parent / "dbt"
+# dbt writes its artifacts here, not into the source tree.
+WORK_DIR = Path(tempfile.gettempdir()) / "dbt"
 
 
 def run_dbt(arguments: list[str]) -> bool:
-    """Runs one dbt command and tells whether it succeeded."""
-    return dbtRunner().invoke(arguments).success
+    """Runs one dbt command and tells whether it succeeded.
+
+    dbt runs as a separate process and is never imported here: on import it loads
+    .env from the working directory, overriding the file chosen by load_env, and
+    replaces the logging setup. The working directory therefore holds no .env.
+    """
+    WORK_DIR.mkdir(parents=True, exist_ok=True)
+    command = [sys.executable, "-m", "dbt.cli.main", *arguments]
+    return subprocess.run(command, cwd=WORK_DIR, check=False).returncode == 0
 
 
 def build_staging(league_id: int, season: int, snapshot_date: str) -> None:
@@ -23,10 +32,8 @@ def build_staging(league_id: int, season: int, snapshot_date: str) -> None:
         RuntimeError: If a model or a data test fails.
         KeyError: If a required environment variable is missing.
     """
-    # dbt writes its artifacts here, not into the source tree.
-    work_dir = Path(tempfile.gettempdir()) / "dbt"
-    os.environ.setdefault("DBT_TARGET_PATH", str(work_dir / "target"))
-    os.environ.setdefault("DBT_LOG_PATH", str(work_dir / "logs"))
+    os.environ.setdefault("DBT_TARGET_PATH", str(WORK_DIR / "target"))
+    os.environ.setdefault("DBT_LOG_PATH", str(WORK_DIR / "logs"))
 
     variables = {
         "league_id": league_id,
