@@ -277,6 +277,28 @@ After the DAG ran twice, `stg_fixtures` physically held 760 rows, and `FINAL` re
 
 **Known limitation.** `mart_team_points` counts points from match results only. Points deductions are not in the fixtures data, so a sanctioned team shows more points than the official table.
 
+### Player staging
+
+Player data goes through the same raw and staging layers. Python loads S3 objects into raw tables, dbt builds and tests staging:
+```bash
+uv run football-warehouse load-match-details    # new and changed matches only
+uv run football-warehouse load-player-snapshot --dataset players   --league-id 88 --season 2023 --snapshot-date 2026-11-08
+uv run football-warehouse load-player-snapshot --dataset sidelined --league-id 88 --season 2023 --snapshot-date 2026-11-08
+uv run football-warehouse load-player-snapshot --dataset injuries  --league-id 88 --season 2023 --snapshot-date 2026-11-08
+uv run football-warehouse build-player-staging
+```
+Add `--team-id` for a snapshot of one team. The Airflow DAG does not run these steps yet.
+
+| Staging table | One row per | Rebuilt |
+| :--- | :--- | :--- |
+| `stg_player_matches` | player and match | changed matches only, each replaced as a whole (`delete_insert`) |
+| `stg_players` | player (latest profile) | fully |
+| `stg_sidelined_players` | player whose absences were requested | fully |
+| `stg_sidelined_periods` | absence period | fully |
+| `stg_injuries` | player and match, latest snapshot of a league season | fully |
+
+A reloaded match replaces all its rows, because `ReplacingMergeTree` alone would keep a player removed by a correction. The API sends `null` instead of zero for a player who played, so counting statistics become `0` for players with minutes in a match that has statistics, and stay `NULL` otherwise.
+
 ---
 
 ## 🔍 Source Data Limitations

@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 import pytest
 import yaml
 
@@ -42,7 +44,7 @@ def test_build_fixtures_s3_url_matches_ingestion_key(monkeypatch, tmp_path, temp
 def test_read_statements_splits_create_tables():
     statements = clickhouse.read_statements("create_tables.sql")
 
-    assert len(statements) == 2
+    assert len(statements) == 6
     assert all("CREATE TABLE IF NOT EXISTS" in s for s in statements)
 
 
@@ -93,3 +95,75 @@ def test_load_fixtures_cleans_unreplaceable_rows_before_loading(monkeypatch):
     clickhouse.load_fixtures(39, 2023, "2026-11-07")
 
     assert steps == ["create_tables.sql", "delete", "load raw"]
+
+
+def test_only_new_or_changed_match_objects_are_loaded(monkeypatch):
+    def modified(second):
+        return datetime.fromtimestamp(second, UTC)
+
+    prefix = "raw/facts/match_details/fixture_id="
+    monkeypatch.setenv("AWS_S3_LANDING_BUCKET_NAME", "test-bucket")
+    monkeypatch.setattr(
+        clickhouse,
+        "list_s3_objects",
+        lambda bucket, key_prefix: {
+            f"{prefix}1/data.json": modified(100),
+            f"{prefix}2/data.json": modified(250),
+            f"{prefix}3/data.json": modified(100),
+        },
+    )
+    monkeypatch.setattr(clickhouse, "execute", lambda *args: "1\t100\n2\t200")
+
+    assert clickhouse.find_changed_match_objects() == [2, 3]
+
+
+@pytest.mark.parametrize(
+    ("changed", "selectors"),
+    [([], []), ([5], ["5"]), ([5, 6, 7], ["{5,6}", "7"])],
+)
+def test_match_objects_are_loaded_in_batches(monkeypatch, changed, selectors):
+    urls = []
+    monkeypatch.setenv("AWS_S3_LANDING_BUCKET_NAME", "test-bucket")
+    monkeypatch.setattr(clickhouse, "MATCHES_PER_INSERT", 2)
+    monkeypatch.setattr(clickhouse, "run_sql_file", lambda *args: None)
+    monkeypatch.setattr(clickhouse, "find_changed_match_objects", lambda: changed)
+    monkeypatch.setattr(
+        clickhouse, "load_raw_snapshot", lambda params, sql: urls.append(params)
+    )
+
+    clickhouse.load_match_details()
+
+    assert [url["s3_url"].partition("fixture_id=")[2] for url in urls] == [
+        f"{selector}/data.json" for selector in selectors
+    ]
+
+
+@pytest.mark.parametrize(
+    ("dataset", "team_id", "loaded", "deletes", "fails"),
+    [
+        ("players", None, "5", True, False),
+        ("players", 194, "5", False, False),
+        ("sidelined", None, "0", True, True),
+        ("injuries", None, "0", True, False),
+    ],
+)
+def test_load_player_snapshot(monkeypatch, dataset, team_id, loaded, deletes, fails):
+    statements = []
+
+    def fake_execute(statement, params=None):
+        statements.append(statement)
+        return loaded
+
+    monkeypatch.setenv("AWS_S3_LANDING_BUCKET_NAME", "test-bucket")
+    monkeypatch.setattr(clickhouse, "execute", fake_execute)
+    monkeypatch.setattr(clickhouse, "run_sql_file", lambda *args: None)
+    monkeypatch.setattr(clickhouse, "load_raw_snapshot", lambda *args: None)
+    arguments = (dataset, 88, 2023, "2026-11-27", team_id)
+
+    if fails:
+        with pytest.raises(ValueError, match="No rows found"):
+            clickhouse.load_player_snapshot(*arguments)
+    else:
+        clickhouse.load_player_snapshot(*arguments)
+
+    assert any(s.startswith("DELETE") for s in statements) == deletes
