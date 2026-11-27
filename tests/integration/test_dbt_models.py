@@ -1,32 +1,11 @@
-"""Runs the dbt models against a real ClickHouse, in a temporary database.
-
-Skipped unless RUN_INTEGRATION_TESTS=1 and the CLICKHOUSE_* variables are set.
-"""
+"""Runs the fixtures staging model against a real ClickHouse."""
 
 import json
-import os
 
 import pytest
 
 from football_pipeline.warehouse import clickhouse
 from football_pipeline.warehouse.transform import build_staging
-
-pytestmark = pytest.mark.skipif(
-    os.environ.get("RUN_INTEGRATION_TESTS") != "1",
-    reason="needs a running ClickHouse",
-)
-
-DATABASE = "dbt_integration_test"
-
-
-@pytest.fixture
-def database(monkeypatch):
-    clickhouse.execute(f"DROP DATABASE IF EXISTS {DATABASE}")
-    clickhouse.execute(f"CREATE DATABASE {DATABASE}")
-    monkeypatch.setenv("CLICKHOUSE_DB", DATABASE)
-    clickhouse.run_sql_file("create_tables.sql")
-    yield
-    clickhouse.execute(f"DROP DATABASE {DATABASE}")
 
 
 def insert_raw(snapshot_date, fixture_id, home_goals=2, home_team_id=33):

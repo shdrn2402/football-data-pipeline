@@ -7,3 +7,11 @@ sources:
     tables:
       - name: raw_fixtures
         description: One row per fixture per snapshot, with the original JSON.
+      - name: raw_match_details
+        description: Latest events, lineups and statistics of every loaded match.
+      - name: raw_players
+        description: One row per player of a players snapshot.
+      - name: raw_sidelined
+        description: One row per requested player of a sidelined snapshot.
+      - name: raw_injuries
+        description: One row per player and match of an injuries snapshot.

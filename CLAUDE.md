@@ -50,7 +50,9 @@ ELT pipeline: API-Sports (API-Football v3) → S3 landing zone (raw JSON) → Cl
 - `date=` in S3 paths is the **snapshot (extraction) date**, not the match date; all snapshots are kept.
 
 **Warehouse (`football-warehouse`)** — `warehouse/clickhouse.py` talks to ClickHouse over the HTTP interface with plain `requests` (no driver).
-- Staging is a dbt project in `warehouse/dbt/`, run by `build-staging` (`warehouse/transform.py`) with the snapshot passed as dbt vars. dbt owns the staging tables; `stg_fixtures` is incremental (`append`) with `full_refresh=false`.
+- Staging is a dbt project in `warehouse/dbt/`; dbt owns the staging tables. `build-staging` builds `stg_fixtures` from one snapshot passed as dbt vars (incremental `append`, `full_refresh=false`). `build-player-staging` builds the player models from the whole raw tables.
+- `warehouse/transform.py` runs dbt as a subprocess from a directory without `.env`. Never import `dbt` into the pipeline process: on import it loads `.env` from the working directory, overriding `PIPELINE_ENV_PATH`, and breaks logging.
+- Player raw loads: `load-match-details` reads only S3 objects that are new or modified since loaded (`source_modified_at`); `load-player-snapshot` replaces a league snapshot (delete, then insert). `stg_player_matches` is `delete_insert` by `fixture_id`, so a match is replaced as a whole; counting statistics follow the `played_count` macro (null means 0 only with minutes and match statistics).
 - Other SQL lives in `warehouse/sql/*.sql`, split on `;` (one statement per HTTP request). Parameters use ClickHouse `{name:Type}` syntax and are sent as `param_<name>`; `run_sql_file` passes only params a statement references.
 - `create_tables.sql` is idempotent and runs before each load/build.
 - AWS keys for the `s3()` table function are substituted into SQL as escaped literals (`__AWS_ACCESS_KEY_ID__` placeholders), deliberately not as query params, so they're masked in ClickHouse logs.

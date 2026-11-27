@@ -1,5 +1,6 @@
 import json
 import logging
+from datetime import datetime
 
 import boto3
 import botocore.exceptions
@@ -95,8 +96,8 @@ def read_json_from_s3(bucket: str, s3_key: str) -> dict:
     return json.loads(response["Body"].read())
 
 
-def list_s3_keys(bucket: str, prefix: str) -> set[str]:
-    """Returns all object keys under a prefix.
+def list_s3_objects(bucket: str, prefix: str) -> dict[str, datetime]:
+    """Returns the keys under a prefix with their modification times.
 
     Raises:
         botocore.exceptions.ClientError: If listing is not allowed or fails.
@@ -107,7 +108,16 @@ def list_s3_keys(bucket: str, prefix: str) -> set[str]:
         .paginate(Bucket=bucket, Prefix=prefix)
     )
     try:
-        return {item["Key"] for page in pages for item in page.get("Contents", [])}
+        return {
+            item["Key"]: item["LastModified"]
+            for page in pages
+            for item in page.get("Contents", [])
+        }
     except botocore.exceptions.ClientError as e:
         logger.error(f"Failed to list S3 bucket '{bucket}' at '{prefix}': {e}")
         raise
+
+
+def list_s3_keys(bucket: str, prefix: str) -> set[str]:
+    """Returns all object keys under a prefix."""
+    return set(list_s3_objects(bucket, prefix))

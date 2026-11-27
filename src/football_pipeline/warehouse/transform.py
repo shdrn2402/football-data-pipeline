@@ -6,11 +6,20 @@ import sys
 import tempfile
 from pathlib import Path
 
+from football_pipeline.warehouse.clickhouse import run_sql_file
+
 logger = logging.getLogger(__name__)
 
 DBT_DIR = Path(__file__).parent / "dbt"
 # dbt writes its artifacts here, not into the source tree.
 WORK_DIR = Path(tempfile.gettempdir()) / "dbt"
+# "+" adds the sources of a model, so their tests run first.
+PLAYER_MODELS = (
+    "+stg_player_matches",
+    "+stg_players",
+    "+stg_sidelined_periods",
+    "+stg_injuries",
+)
 
 
 def run_dbt(arguments: list[str]) -> bool:
@@ -25,8 +34,8 @@ def run_dbt(arguments: list[str]) -> bool:
     return subprocess.run(command, cwd=WORK_DIR, check=False).returncode == 0
 
 
-def build_staging(league_id: int, season: int, snapshot_date: str) -> None:
-    """Builds the staging models from one raw snapshot and runs their tests.
+def build_models(selection: tuple[str, ...], variables: dict | None = None) -> None:
+    """Builds the selected dbt models and runs their tests.
 
     Raises:
         RuntimeError: If a model or a data test fails.
@@ -35,22 +44,31 @@ def build_staging(league_id: int, season: int, snapshot_date: str) -> None:
     os.environ.setdefault("DBT_TARGET_PATH", str(WORK_DIR / "target"))
     os.environ.setdefault("DBT_LOG_PATH", str(WORK_DIR / "logs"))
 
-    variables = {
-        "league_id": league_id,
-        "season": season,
-        "snapshot_date": snapshot_date,
-    }
-    succeeded = run_dbt(
-        [
-            "build",
-            "--project-dir",
-            str(DBT_DIR),
-            "--profiles-dir",
-            str(DBT_DIR),
-            "--vars",
-            json.dumps(variables),
-        ]
-    )
-    if not succeeded:
+    arguments = [
+        "build",
+        "--project-dir",
+        str(DBT_DIR),
+        "--profiles-dir",
+        str(DBT_DIR),
+        "--select",
+        *selection,
+    ]
+    if variables:
+        arguments += ["--vars", json.dumps(variables)]
+    if not run_dbt(arguments):
         raise RuntimeError("dbt build failed. See the failed model or test above.")
     logger.info("Staging is built and its tests passed.")
+
+
+def build_staging(league_id: int, season: int, snapshot_date: str) -> None:
+    """Builds fixtures staging from one raw snapshot."""
+    build_models(
+        ("+stg_fixtures",),
+        {"league_id": league_id, "season": season, "snapshot_date": snapshot_date},
+    )
+
+
+def build_player_staging() -> None:
+    """Builds player staging from everything loaded into the raw player tables."""
+    run_sql_file("create_tables.sql")
+    build_models(PLAYER_MODELS)
