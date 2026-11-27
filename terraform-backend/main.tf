@@ -12,8 +12,9 @@ provider "aws" {
 }
 
 resource "aws_s3_bucket" "terraform_state" {
-  bucket        = "football-data-pipeline-terraform-state"
-  force_destroy = true
+  bucket = "football-data-pipeline-terraform-state"
+  # A bucket that still holds state files cannot be destroyed.
+  force_destroy = false
 }
 
 resource "aws_s3_bucket_versioning" "terraform_state_versioning" {
@@ -21,16 +22,5 @@ resource "aws_s3_bucket_versioning" "terraform_state_versioning" {
 
   versioning_configuration {
     status = "Enabled"
-  }
-}
-
-resource "aws_dynamodb_table" "terraform_state_locking" {
-  name         = "football-data-pipeline-terraform-state-locking"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "LockID"
-
-  attribute {
-    name = "LockID"
-    type = "S"
   }
 }
