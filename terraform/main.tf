@@ -24,8 +24,44 @@ provider "aws" {
 }
 
 resource "aws_s3_bucket" "data_landing_zone" {
-  bucket        = local.s3_landing_bucket_name
-  force_destroy = true
+  bucket = local.s3_landing_bucket_name
+  # A bucket that still holds objects cannot be destroyed.
+  force_destroy = false
+}
+
+# Keeps the previous version of an overwritten or deleted object, so it can be restored.
+resource "aws_s3_bucket_versioning" "data_landing_zone_versioning" {
+  bucket = aws_s3_bucket.data_landing_zone.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "data_landing_zone_lifecycle" {
+  bucket = aws_s3_bucket.data_landing_zone.id
+
+  rule {
+    id     = "expire-old-versions"
+    status = "Enabled"
+
+    filter {}
+
+    # Applies only to replaced versions; current objects never expire.
+    noncurrent_version_expiration {
+      noncurrent_days = var.noncurrent_version_retention_days
+    }
+
+    expiration {
+      expired_object_delete_marker = true
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
+
+  depends_on = [aws_s3_bucket_versioning.data_landing_zone_versioning]
 }
 
 resource "aws_s3_bucket_public_access_block" "data_landing_zone_access_block" {

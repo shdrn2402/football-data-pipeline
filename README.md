@@ -11,7 +11,7 @@ An end-to-end Data Engineering ELT pipeline designed to extract football sports 
 
 >💡 Project Background:
 >This project is inspired by the DataTalks.Club Data Engineering Zoomcamp, but completely re-engineered around a live external sports domain instead of the default NYC Taxi dataset.
->It features a custom CLI-based ingestion tool with pagination and API rate-limiting, optimized container packaging using Astral uv for fast dependency management executed under an unprivileged user, and fully automated cloud infrastructure provisioned via Terraform with remote S3 state storage and DynamoDB locking.
+>It features a custom CLI-based ingestion tool with pagination and API rate-limiting, optimized container packaging using Astral uv for fast dependency management executed under an unprivileged user, and fully automated cloud infrastructure provisioned via Terraform with remote S3 state storage and native S3 state locking.
 
 ## 🏗 System Architecture
 
@@ -46,7 +46,7 @@ flowchart TD
 
 ## ⚙️ Key Technical Features
 
-* **Infrastructure as Code (IaC):** AWS S3 landing bucket and scoped IAM ingestion policies managed via **Terraform** (~> 6.0) with remote S3 backend state and DynamoDB state locking.
+* **Infrastructure as Code (IaC):** AWS S3 landing bucket and scoped IAM ingestion policies managed via **Terraform** (AWS provider ~> 6.0) with remote state in S3 and native S3 state locking. Both buckets are versioned and cannot be destroyed while they hold objects.
 * **Resilient Ingestion Engine (`src/`):** Parameterized CLI built with `click` and `requests`. Features automated pagination, rate-limit sleep windows, dynamic S3 folder partitioning from per-endpoint templates (e.g. `league_id / season / date`), and structured logging.
 * **Orchestration Layer:** **Apache Airflow 3.3.2** and **Kestra 2.0** available as alternative Docker Compose stacks, each backed by its own PostgreSQL 18 metadata database for task execution.
 * **Local Data Warehouse:** **ClickHouse 26.8 LTS** included in each orchestration stack, with persistent volumes and a health check. The Airflow DAG `football_fixtures_elt` loads match results from S3 into raw and staging tables and builds a team points mart.
@@ -72,7 +72,7 @@ football-data-pipeline/
 │       ├── storage/          # S3 storage clients and uploaders
 │       └── warehouse/        # ClickHouse loading CLI and SQL models
 ├── terraform/                # IaC definitions (S3, IAM)
-├── terraform-backend/        # IaC state bucket and lock table definitions
+├── terraform-backend/        # IaC state bucket definition
 ├── tests/                    # Unit test suite
 ├── Dockerfile                # Hardened container build recipe (Python 3.13 + uv)
 ├── pyproject.toml            # Project packaging metadata and build definitions
@@ -99,7 +99,7 @@ football-data-pipeline/
 ### 1. Provision Infrastructure with Terraform
 Navigate to the terraform directory to initialize and deploy the S3 Data Lake and IAM credentials:
 ```bash
-# 1. Initialize remote state and lock table
+# 1. Create the remote state bucket
 cd terraform-backend
 terraform init
 terraform apply -auto-approve
@@ -109,6 +109,13 @@ cd ../terraform
 terraform init
 terraform plan -var="environment=dev"
 terraform apply -var="environment=dev"
+```
+
+#### Restoring an overwritten object
+The landing bucket keeps replaced and deleted versions for 90 days (`noncurrent_version_retention_days`). Restoring needs credentials that may read versions, which the data loader user does not have:
+```bash
+aws s3api list-object-versions --bucket <bucket> --prefix <key>
+aws s3api copy-object --bucket <bucket> --key <key> --copy-source "<bucket>/<key>?versionId=<version-id>"
 ```
 
 ### 2. Configure Environment Variables
@@ -252,7 +259,7 @@ After the DAG ran twice, `stg_fixtures` physically held 760 rows, and `FINAL` re
 
 ## 📌 Project Roadmap
 
-- [x] Cloud infrastructure as code with Terraform (S3, IAM, S3 Remote State & DynamoDB Lock)
+- [x] Cloud infrastructure as code with Terraform (S3, IAM, S3 remote state with locking)
 - [x] Ingestion CLI engine with rate-limiting, pagination, and S3 partitioning
 - [x] Secure Docker container build with Astral uv and non-root user execution
 - [x] Orchestration deployment via Docker Compose (Apache Airflow 3 & Kestra 2.0)
