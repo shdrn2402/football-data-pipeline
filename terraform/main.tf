@@ -92,6 +92,18 @@ data "aws_iam_policy_document" "data_loader_policy" {
     ]
     resources = ["${aws_s3_bucket.data_landing_zone.arn}/*"]
   }
+  # Lets ingestion see which raw objects are already stored.
+  statement {
+    effect    = "Allow"
+    actions   = ["s3:ListBucket"]
+    resources = [aws_s3_bucket.data_landing_zone.arn]
+
+    condition {
+      test     = "StringLike"
+      variable = "s3:prefix"
+      values   = ["raw/*"]
+    }
+  }
 }
 
 resource "aws_iam_user_policy" "data_loader_policy" {

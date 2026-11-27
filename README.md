@@ -200,6 +200,12 @@ uv run football-warehouse load-fixtures --league-id 39 --season 2023 --target-da
 uv run football-warehouse build-team-points --league-id 39 --season 2023
 ```
 
+Match details (events, lineups, team and player statistics) are downloaded for the finished matches of a fixtures snapshot, so extract the snapshot first:
+```bash
+uv run football-pipeline --endpoint match_details --league-id 39 --season 2023 --target-date 2026-11-08 --max-fixtures 3
+```
+Each match is stored as `raw/facts/match_details/fixture_id=<id>/data.json`. Stored matches are skipped, so repeated runs continue the season. `--fixture-id` downloads one match again. `batch_size` in `configs/config.yaml` switches between one match per request (free plan) and up to 20 (paid plan).
+
 Or run the ingestion inside the Docker container:
 ```bash
 docker run --rm --env-file .env.local football-pipeline:latest football-pipeline --endpoint leagues --league-id 39
