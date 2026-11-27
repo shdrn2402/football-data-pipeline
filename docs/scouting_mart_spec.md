@@ -17,7 +17,7 @@ Player statistics are the core. Match results are secondary context. Screening a
 
 | Layer | Grain | Content |
 |---|---|---|
-| Staging | player and match | All match statistics with club and league |
+| Staging | player and match | All match statistics with club and league (`stg_player_matches`). Profiles, absence periods and injuries are separate staging tables |
 | `dm_scouting_efficiency` | `(player_id, season)` | One row per player and season for screening |
 
 Staging and the mart are dbt models on ClickHouse; loading raw data from S3 is done in Python.
@@ -116,6 +116,7 @@ A season is identified by its start year. The mart is rebuilt per season across 
 - **Availability:** only injuries and illness lower `availability_rate`. Suspensions are counted separately, and unused matches on the bench do not count.
 - **One source for all leagues:** availability comes from `/sidelined`, so leagues are comparable. `/injuries` has no data for some leagues and is used only to cross-check where it exists.
 - **Suspensions are never estimated:** `/sidelined` misses most of them and card rules differ between leagues, so a league season without `/injuries` keeps `NULL`. Cards from match statistics still cover discipline in every league.
+- **Missing statistics:** for a player with minutes in a match with statistics, a `null` counting statistic means `0`. For unused substitutes, and for matches where no player has a pass count, it stays `NULL`. `rating` is never filled in.
 - **Never asked or never absent:** a player in the requested list of a `/sidelined` snapshot without periods has no known absence. A player not in the list has `NULL`.
 - **Several clubs or leagues:** statistics are summed. Percentiles use the primary league.
 - **Efficiency index:** weighted percentiles with weights per position, a discipline penalty, multiplied by availability. Weights are fixed before any backtest.
@@ -170,6 +171,11 @@ Checked on 2026-11-27 on the free plan, mostly on small samples.
 | `null` in counting statistics of a player who played means zero | Goals, assists, shots, key passes, tackles and dribbles hold no zeros, only `null`. Cards do use `0`. Checked on 4 Premier League matches |
 | `end: null` in `/sidelined` | 14 periods starting in 2024 and 2025, none followed by a newer period in these samples |
 | `/players` pages in 2023 | 59, 49, 43 and 37 for Championship, Eredivisie, Liga Portugal and Belgium |
+| Counting statistics follow the same rule in the Eredivisie | No zeros among players who played, only `null`, in 5 Ajax matches |
+| Player goals agree with the score | 20 of 20 team matches in 5 Premier League and 5 Eredivisie matches |
+| `/players` covers match details | All 35 Ajax players of 5 matches are in the Ajax 2023 snapshot |
+| `passes.accuracy` can be missing | 3 player matches have passes but no accuracy, kept as `NULL` |
+| `/sidelined` types are free text | Most frequent for Ajax 2023: `Knock`, `Knee Injury`, `Unknown`, `Hamstring`, `Illness` |
 
 ### Market value source
 
@@ -188,12 +194,12 @@ Checked on 2026-11-27 on files dated 2026-09-05. `player_valuations` holds 65630
 
 To verify on data before the related fields are implemented:
 
-- Does `null` in player statistics mean zero in the four tracked leagues too, and for every field?
+- Does `null` mean zero in all four tracked leagues, and what if only some statistics of a match are covered?
 - Are date of birth and absence periods filled for all players, not only in samples?
 - How complete and how fresh is `/sidelined` for the ongoing season in each league?
 - How should `end: null` in `/sidelined` be treated? It also occurs in old records followed by newer ones.
 - Which `/sidelined` types count as injury or illness, for example `Unknown`?
-- Does `/players` list everyone who appears in match details?
+- Does `/players` list everyone who appears in match details, for whole leagues?
 - Do `/injuries` suspension rows agree with the cards in match statistics?
 - Does the paid plan give access to the ongoing season?
 - After the paid load, what is the coverage of `/injuries` and `/sidelined`, including suspensions, for all tracked leagues and seasons?
