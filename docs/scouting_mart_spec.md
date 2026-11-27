@@ -11,7 +11,7 @@ The platform solves two tasks in two stages:
 | v1 | Find talented players by on-pitch efficiency, discipline and availability | API-Football |
 | v2 | Find undervalued players and backtest whether high efficiency leads to market value growth | API-Football and an external market value source (to be chosen) |
 
-Player statistics are the core. Match results are secondary context. Only finished seasons are loaded.
+Player statistics are the core. Match results are secondary context. Screening and backtesting use finished seasons. The ongoing season is loaded during the paid plan month to demonstrate work with live data.
 
 ## 2. Layers
 
@@ -41,6 +41,7 @@ A season is identified by its start year. The mart is rebuilt per season across 
 | `primary_league_id` | `UInt32` | Tracked league with the most minutes |
 | `current_club_id` | `UInt64` | Club of the player's last match in the season |
 | `clubs_count` | `UInt8` | Clubs the player appeared for in the tracked leagues |
+| `is_season_complete` | `UInt8` | `0` for an ongoing season, whose percentiles are not comparable with finished ones |
 
 ### Playing time
 
@@ -117,7 +118,27 @@ A season is identified by its start year. The mart is rebuilt per season across 
 - **Injury periods:** clipped to the season dates, so a period crossing two seasons is not counted twice. The summer break is not counted.
 - **`Questionable` rows** in `/injuries` are not missed matches.
 
-## 5. Data sources
+## 5. Loading rules
+
+One algorithm and one DAG serve finished and ongoing seasons:
+
+1. Get the fixture list of a league season.
+2. Select finished matches by the status of each match.
+3. Download details only for matches that are not stored yet.
+4. Load ClickHouse and rebuild the mart.
+
+An ongoing season also needs:
+
+| Case | Behaviour |
+|---|---|
+| Postponed, abandoned or cancelled match | Not finished, no details. A later run sees the new date or status |
+| Late or corrected match details | Matches of the last days are downloaded again |
+| New injuries and absence periods | Refreshed regularly, not only when missing |
+| Daily run | Scheduled |
+
+A daily snapshot of the fixture list stays in S3, so changes can be replayed after the paid plan ends. Tests cover a postponed match that is played later, a moved date and corrected statistics. An as-of date shows incremental loading on a finished season, but it cannot show rescheduling: the API returns the final state.
+
+## 6. Data sources
 
 | Data | Endpoint | Notes |
 |---|---|---|
@@ -129,7 +150,7 @@ A season is identified by its start year. The mart is rebuilt per season across 
 
 Observed on the free plan on 2026-11-27: Eredivisie 2023 `/injuries` returned 1769 rows for 297 players in one request. `/sidelined` accepted five players in one request. Match events have no ID of their own, so the details of a match must be replaced as a whole.
 
-## 6. Open questions
+## 7. Open questions
 
 To verify on data before the related fields are implemented:
 
@@ -139,9 +160,11 @@ To verify on data before the related fields are implemented:
 - How should `end: null` in `/sidelined` be treated? It also occurs in old records followed by newer ones.
 - Does `/sidelined` include suspensions, and how many players does one request accept?
 - Do `/injuries` suspension rows agree with the cards in match statistics?
+- Does the paid plan give access to the ongoing season?
 
 To decide:
 
+- How many days of finished matches an ongoing season downloads again
 - Position weights of the efficiency index
 - `availability_rate` for a player with several clubs
 - Market value source, its terms of use and the way players are matched to it
