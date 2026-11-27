@@ -7,8 +7,28 @@ from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_CONFIG_PATH = PROJECT_ROOT / "configs" / "config.yaml"
+DEFAULT_ENV_PATH = PROJECT_ROOT / ".env"
 
-def load_config(config_path: str | Path, env_path: str | Path) -> dict:
+
+def load_env(env_path: str | Path | None = None) -> None:
+    """
+    Loads variables from an env file without overriding those already set.
+
+    A missing file is ignored, as containers get their variables from the
+    orchestrator.
+
+    Args:
+        env_path (str | Path | None): Path to the env file. Defaults to
+            PIPELINE_ENV_PATH, then to .env in the project root.
+    """
+    load_dotenv(env_path or os.environ.get("PIPELINE_ENV_PATH") or DEFAULT_ENV_PATH)
+
+
+def load_config(
+    config_path: str | Path | None = None, env_path: str | Path | None = None
+) -> dict:
     """
     Loads YAML configuration and injects required environment variables.
 
@@ -19,8 +39,9 @@ def load_config(config_path: str | Path, env_path: str | Path) -> dict:
     or a provided .env file.
 
     Args:
-        config_path (str | Path): Path to the static config.yaml file.
-        env_path (str | Path): Path to the .env file.
+        config_path (str | Path | None): Path to the static config.yaml file.
+            Defaults to PIPELINE_CONFIG_PATH, then to configs/config.yaml.
+        env_path (str | Path | None): Path to the env file, see load_env.
 
     Raises:
         FileNotFoundError: If the configuration file does not exist.
@@ -31,9 +52,10 @@ def load_config(config_path: str | Path, env_path: str | Path) -> dict:
     Returns:
         dict: Parsed and consolidated configuration data.
     """
-    # Silently ignores if .env is missing (expected in Docker/cloud environments)
-    load_dotenv(env_path)
-    config_path = Path(config_path)
+    load_env(env_path)
+    config_path = Path(
+        config_path or os.environ.get("PIPELINE_CONFIG_PATH") or DEFAULT_CONFIG_PATH
+    )
 
     try:
         config = yaml.safe_load(config_path.read_text())

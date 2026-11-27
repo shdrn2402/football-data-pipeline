@@ -1,5 +1,6 @@
 import click
 
+from football_pipeline.core.config import load_env
 from football_pipeline.core.logger import setup_logger
 from football_pipeline.warehouse.clickhouse import build_team_points, load_fixtures
 
@@ -8,6 +9,7 @@ from football_pipeline.warehouse.clickhouse import build_team_points, load_fixtu
 def cli() -> None:
     """Loads raw data from S3 into ClickHouse and builds data marts."""
     setup_logger()
+    load_env()
 
 
 @cli.command("load-fixtures")

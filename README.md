@@ -175,16 +175,27 @@ Run one stack at a time: both publish ports `8080`, `8123`, and `9000`. Each sta
 | ClickHouse SQL UI | `http://localhost:8123/play` |
 | ClickHouse native TCP | `localhost:9000` |
 
-### 5. Run Manual Ingestion
-You can test the ingestion engine directly using uv:
+### 5. Run the CLIs Manually
+The root `.env` holds `FLOW_`-prefixed secrets for the orchestrators, while the code reads unprefixed names. For local runs, create a separate file from the template and fill it in:
 ```bash
-uv run football-pipeline --endpoint leagues --league-id 39
-uv run football-pipeline --endpoint teams --league-id 39 --season 2024
+cp env.local.example .env.local
 ```
 
-Or run it inside the Docker container:
+Both CLIs load the file named by `PIPELINE_ENV_PATH` (default: `.env`). Variables already set in the environment take precedence.
 ```bash
-docker run --rm --env-file .env football-pipeline:latest football-pipeline --endpoint leagues --league-id 39
+export PIPELINE_ENV_PATH=.env.local
+
+uv run football-pipeline --endpoint leagues --league-id 39
+uv run football-pipeline --endpoint fixtures --league-id 39 --season 2023 --target-date 2026-11-08
+
+# Requires the ClickHouse service of a running stack (step 4)
+uv run football-warehouse load-fixtures --league-id 39 --season 2023 --target-date 2026-11-08
+uv run football-warehouse build-team-points --league-id 39 --season 2023
+```
+
+Or run the ingestion inside the Docker container:
+```bash
+docker run --rm --env-file .env.local football-pipeline:latest football-pipeline --endpoint leagues --league-id 39
 ```
 
 ### 6. Run the Fixtures ELT DAG
