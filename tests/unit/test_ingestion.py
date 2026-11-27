@@ -203,3 +203,38 @@ def test_missing_key_value_fails_before_api_call(monkeypatch, endpoint):
         )
 
     assert requests_made == []
+
+
+@pytest.mark.parametrize(
+    ("endpoint", "kwargs", "expected_params"),
+    [
+        ("injuries", {"league_id": 88, "season": 2023}, {"league": 88, "season": 2023}),
+        ("fixtures_head_to_head", {"h2h": "33-34"}, {"h2h": "33-34"}),
+        (
+            "teams_statistics",
+            {"league_id": 88, "season": 2023, "team_id": 200},
+            {"league": 88, "season": 2023, "team": 200, "date": "2026-11-07"},
+        ),
+    ],
+)
+def test_snapshot_date_is_sent_only_where_it_does_not_narrow(
+    monkeypatch, endpoint, kwargs, expected_params
+):
+    config = yaml.safe_load(CONFIG_PATH.read_text())
+    config["api_football_key"] = "test-key"
+    config["aws_s3_landing_bucket"] = "test-bucket"
+
+    sent = []
+
+    def fake_fetch_data(**request):
+        sent.append(request["query_params"])
+        return {"response": [{"id": 1}]}
+
+    monkeypatch.setattr(ingestion, "fetch_data", fake_fetch_data)
+    monkeypatch.setattr(ingestion, "upload_to_s3", lambda *args: None)
+
+    ingestion.run_ingestion_pipeline(
+        endpoint=endpoint, target_date="2026-11-07", config=config, **kwargs
+    )
+
+    assert sent == [expected_params]

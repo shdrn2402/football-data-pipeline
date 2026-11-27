@@ -37,7 +37,7 @@ api:
 
     fixtures_head_to_head:
       path: "/fixtures/headtohead"
-      allowed_params: ["h2h", "date", "league", "season", "last", "next", "from", "to", "status"]
+      allowed_params: ["h2h", "league", "season", "last", "next", "from", "to", "status"]
       s3_template: "raw/facts/fixtures_head_to_head/h2h={h2h}/date={target_date}"
       allow_empty: true
 
@@ -73,7 +73,7 @@ api:
     
     injuries:
       path: "/injuries"
-      allowed_params: ["league", "season", "fixture", "team", "player", "date", "timezone"]
+      allowed_params: ["league", "season", "fixture", "team", "player", "timezone"]
       s3_template: "raw/facts/injuries/league_id={league}/season={season}/date={target_date}"
       allow_empty: true
 
