@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 import yaml
 
 from football_pipeline.services import ingestion
@@ -38,3 +39,28 @@ def test_fixtures_request_covers_whole_season(monkeypatch):
         captured["s3_key"]
         == "raw/facts/fixtures/league_id=39/season=2023/date=2026-11-07/data.json"
     )
+
+
+def test_failed_fetch_does_not_upload_to_s3(monkeypatch):
+    config = yaml.safe_load(CONFIG_PATH.read_text())
+    config["api_football_key"] = "test-key"
+    config["aws_s3_landing_bucket"] = "test-bucket"
+
+    uploads = []
+
+    def fake_fetch_data(**kwargs):
+        raise ValueError("API returned errors")
+
+    monkeypatch.setattr(ingestion, "fetch_data", fake_fetch_data)
+    monkeypatch.setattr(ingestion, "upload_to_s3", lambda *args: uploads.append(args))
+
+    with pytest.raises(ValueError):
+        ingestion.run_ingestion_pipeline(
+            endpoint="fixtures",
+            target_date="2026-11-07",
+            config=config,
+            league_id=39,
+            season=2023,
+        )
+
+    assert uploads == []
