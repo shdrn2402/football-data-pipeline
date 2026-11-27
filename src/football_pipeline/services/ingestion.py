@@ -55,13 +55,8 @@ def run_ingestion_pipeline(
     team_id = kwargs.get("team_id")
     player_id = kwargs.get("player_id")
 
-    target_entity_id = (
-        player_id
-        if endpoint in ("players", "players_statistics")
-        else team_id
-        if endpoint == "teams"
-        else league_id
-    )
+    # The API "id" parameter means a player on /players and a league on /leagues.
+    target_entity_id = player_id if endpoint == "players_statistics" else league_id
 
     all_args = {
         "date": target_date,

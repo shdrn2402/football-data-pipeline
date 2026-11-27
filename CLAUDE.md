@@ -36,7 +36,7 @@ docker compose --env-file .env -f orchestration/kestra/compose.yaml up -d
 ELT pipeline: API-Sports (API-Football v3) → S3 landing zone (raw JSON) → ClickHouse (raw → staging → mart). Infra in `terraform/` (S3 bucket, IAM) with remote state from `terraform-backend/`.
 
 **Ingestion (`football-pipeline`)** — `cli.py` → `services/ingestion.py` → `extractors/football_api.py` (pagination, rate-limit sleep) → `domain/schemas.py` → `storage/s3.py`.
-- Endpoints are data-driven by `configs/config.yaml`: each entry has `path`, `allowed_params` (whitelist of query params actually sent) and `s3_template` (S3 key layout). Adding an endpoint means adding a config entry and a `click.Choice` value in `cli.py`.
+- Endpoints are data-driven by `configs/config.yaml`: each entry has `path`, `allowed_params` (whitelist of query params actually sent) and `s3_template` (S3 key layout). The CLI takes the endpoint names from the config, so adding an endpoint means adding a config entry. `allowed_params` may only list parameters that `ingestion.py` can build (covered by a test).
 - `date=target_date` is sent to the API only where it matches snapshot semantics (`teams_statistics`). The CLI has no default league or season.
 - Filters (`league`, `season`, `team`, `player`, `fixture`) missing from `s3_template` are added to the S3 key (`add_filter_partitions`), so a filtered run never overwrites a full snapshot. A missing template value fails before the API call.
 - An empty API response fails the run before the upload, unless the endpoint sets `allow_empty: true`.

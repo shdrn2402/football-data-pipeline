@@ -12,30 +12,11 @@ from football_pipeline.services.ingestion import run_ingestion_pipeline
 @click.command()
 @click.option(
     "--endpoint",
-    type=click.Choice(
-        [
-            "leagues",
-            "teams",
-            "teams_statistics",
-            "standings",
-            "fixtures",
-            "fixtures_rounds",
-            "fixtures_head_to_head",
-            "fixtures_statistics",
-            "fixtures_events",
-            "fixtures_lineups",
-            "fixtures_players",
-            "players_statistics",
-            "players_squads",
-            "injuries",
-            "transfers",
-        ],
-        case_sensitive=False,
-    ),
+    type=str.lower,
     default="fixtures",
     required=True,
     envvar="INGEST_ENDPOINT",
-    help="Choose the API endpoint to ingest data from.",
+    help="API endpoint to ingest data from, as named in config.yaml.",
 )
 @click.option(
     "--league-id",
@@ -107,6 +88,13 @@ def cli(
     env_path = os.environ.get("PIPELINE_ENV_PATH", default_env_path)
 
     config = load_config(config_path, env_path)
+
+    endpoints = config["api"]["endpoints"]
+    if endpoint not in endpoints:
+        raise click.BadParameter(
+            f"'{endpoint}' is not one of: {', '.join(endpoints)}.",
+            param_hint="'--endpoint'",
+        )
 
     run_ingestion_pipeline(
         endpoint=endpoint,
