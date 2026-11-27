@@ -11,6 +11,7 @@ uv sync --frozen --dev
 uv run ruff check src/ tests/
 uv run ruff format --check src/ tests/
 uv run pytest tests/
+RUN_INTEGRATION_TESTS=1 uv run pytest tests/integration   # dbt models; needs a ClickHouse and CLICKHOUSE_* variables
 ```
 
 Single test: `uv run pytest tests/unit/test_warehouse.py::test_load_fixtures_fails_on_empty_snapshot`
@@ -19,7 +20,8 @@ Two console scripts (defined in `pyproject.toml`):
 
 ```bash
 uv run football-pipeline --endpoint fixtures --league-id 39 --season 2023 --snapshot-date 2026-11-08   # API -> S3
-uv run football-warehouse load-fixtures --league-id 39 --season 2023 --snapshot-date 2026-11-08        # S3 -> ClickHouse raw/stg
+uv run football-warehouse load-fixtures --league-id 39 --season 2023 --snapshot-date 2026-11-08        # S3 -> ClickHouse raw
+uv run football-warehouse build-staging --league-id 39 --season 2023 --snapshot-date 2026-11-08      # raw -> stg (dbt)
 uv run football-warehouse build-team-points --league-id 39 --season 2023                             # stg -> mart
 ```
 
@@ -48,21 +50,22 @@ ELT pipeline: API-Sports (API-Football v3) → S3 landing zone (raw JSON) → Cl
 - `date=` in S3 paths is the **snapshot (extraction) date**, not the match date; all snapshots are kept.
 
 **Warehouse (`football-warehouse`)** — `warehouse/clickhouse.py` talks to ClickHouse over the HTTP interface with plain `requests` (no driver).
-- SQL lives in `warehouse/sql/*.sql`, split on `;` (one statement per HTTP request). Parameters use ClickHouse `{name:Type}` syntax and are sent as `param_<name>`; `run_sql_file` passes only params a statement references.
+- Staging is a dbt project in `warehouse/dbt/`, run by `build-staging` (`warehouse/transform.py`) with the snapshot passed as dbt vars. dbt owns the staging tables; `stg_fixtures` is incremental (`append`) with `full_refresh=false`.
+- Other SQL lives in `warehouse/sql/*.sql`, split on `;` (one statement per HTTP request). Parameters use ClickHouse `{name:Type}` syntax and are sent as `param_<name>`; `run_sql_file` passes only params a statement references.
 - `create_tables.sql` is idempotent and runs before each load/build.
 - AWS keys for the `s3()` table function are substituted into SQL as escaped literals (`__AWS_ACCESS_KEY_ID__` placeholders), deliberately not as query params, so they're masked in ClickHouse logs.
 - `build_fixtures_s3_url` builds the object key from the `fixtures` `s3_template`, so the S3 layout is defined only in `configs/config.yaml`. The warehouse reads it with `read_config()`, which needs no secrets. A test compares the URL with the key ingestion writes.
-- `load_fixtures` raises, so the DAG fails instead of staying green, if the snapshot loaded 0 rows, a fixture or team ID is 0 (checked on raw before staging), or a fixture of the snapshot is missing in staging. It deletes raw rows with `fixture_id = 0` of the snapshot before loading, so a re-run is not blocked by them.
+- Quality checks: `load_fixtures` raises if the snapshot loaded 0 rows, and deletes raw rows with `fixture_id = 0` of the snapshot before loading, so a re-run is not blocked by them. dbt tests in `warehouse/dbt/tests/` check for zero IDs on the raw source (a failure skips the model) and that staging covers the snapshot.
 - Data model: `raw_fixtures` and `stg_fixtures` are `ReplacingMergeTree(ingested_at)` partitioned by `(league_id, season)` — always read them with `FINAL`. `ORDER BY` is the dedup key (raw: per snapshot; stg: per match). Don't partition by match date (rescheduled matches would duplicate across partitions). `mart_team_points` is a plain `MergeTree` rebuilt per league/season. See README "ClickHouse Data Model" for rationale.
 
 **Orchestration** — Airflow (`orchestration/airflow/dags/`) and Kestra (`orchestration/kestra/flows/`) are alternative stacks; both only launch the `football-pipeline:latest` container (Airflow via `DockerOperator` over the mounted docker socket). No business logic lives in DAGs.
-- `football_fixtures_elt` (Airflow only, `schedule=None`): extract → load → mart. Extract and load must share `SNAPSHOT_DATE` (`dag_run.run_after`) to address the same snapshot.
+- `football_fixtures_elt` (Airflow only, `schedule=None`): extract → load → staging (dbt) → mart. Extract and load must share `SNAPSHOT_DATE` (`dag_run.run_after`) to address the same snapshot.
 - Warehouse tasks join the fixed Docker network `football_airflow` to reach the `clickhouse` service; the extract task uses `bridge`.
 - `football_bootstrap_dimensions` exists in both Airflow and Kestra (leagues, teams).
 
 **Configuration / env vars** — the code reads unprefixed names (`API_FOOTBALL_KEY`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_S3_LANDING_BUCKET_NAME`, `CLICKHOUSE_HOST/PORT/USER/PASSWORD/DB`). The root `.env` (template: `env.example`) uses `FLOW_`-prefixed secrets, which the orchestrators map: Airflow compose turns them into connections `aws_s3_conn`, `api_football_conn`, `clickhouse_conn` and variable `landing_bucket_name`; Kestra exposes them via `env-vars-prefix: "FLOW_"` as `envs.*`. `PIPELINE_CONFIG_PATH` / `PIPELINE_ENV_PATH` override config/.env locations. Both CLIs load the env file through `load_env()` (`core/config.py`), which never overrides variables already set; local `uv run` uses `.env.local` (template: `env.local.example`).
 
-**Tests** — unit tests only (`tests/unit/`), no external services: network, S3 and ClickHouse calls are replaced with `monkeypatch.setattr` on module-level functions (e.g. `ingestion.fetch_data`, `clickhouse.execute`). Keep functions module-level so this pattern keeps working.
+**Tests** — unit tests (`tests/unit/`) use no external services; `tests/integration/` runs the dbt models against a real ClickHouse in a temporary database and is skipped unless `RUN_INTEGRATION_TESTS=1` (CI sets it). In unit tests network, S3 and ClickHouse calls are replaced with `monkeypatch.setattr` on module-level functions (e.g. `ingestion.fetch_data`, `clickhouse.execute`). Keep functions module-level so this pattern keeps working.
 
 ## Conventions
 

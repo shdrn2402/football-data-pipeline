@@ -1,0 +1,5 @@
+version: 2
+
+models:
+  - name: stg_fixtures
+    description: Current state of every fixture. Read it with FINAL.

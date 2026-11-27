@@ -12,26 +12,7 @@ ENGINE = ReplacingMergeTree(ingested_at)
 PARTITION BY (league_id, season)
 ORDER BY (league_id, season, snapshot_date, fixture_id);
 
--- One row per fixture: the version with the latest ingested_at wins.
-CREATE TABLE IF NOT EXISTS stg_fixtures
-(
-    league_id UInt32,
-    season UInt16,
-    fixture_id UInt64,
-    match_at DateTime('UTC'),
-    round String,
-    status LowCardinality(String),
-    home_team_id UInt32,
-    home_team_name String,
-    away_team_id UInt32,
-    away_team_name String,
-    home_goals Nullable(UInt8),
-    away_goals Nullable(UInt8),
-    ingested_at DateTime64(3, 'UTC')
-)
-ENGINE = ReplacingMergeTree(ingested_at)
-PARTITION BY (league_id, season)
-ORDER BY (league_id, season, fixture_id);
+-- Staging tables are built and owned by dbt.
 
 -- Fully rebuilt per league and season, so a plain MergeTree is enough.
 CREATE TABLE IF NOT EXISTS mart_team_points

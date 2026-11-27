@@ -1,0 +1,9 @@
+version: 2
+
+sources:
+  - name: raw
+    description: Raw API responses loaded from S3 by football-warehouse.
+    schema: "{{ env_var('CLICKHOUSE_DB') }}"
+    tables:
+      - name: raw_fixtures
+        description: One row per fixture per snapshot, with the original JSON.
