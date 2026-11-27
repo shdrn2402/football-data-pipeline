@@ -32,6 +32,7 @@ def run_ingestion_pipeline(
             - h2h (str): Hyphen-separated team IDs for head-to-head statistics.
 
     Raises:
+        ValueError: If the API response is empty and the endpoint does not allow it.
         ValidationError: If the API response fails Pydantic schema validation.
         Exception: Propagates network errors from fetch_data or Boto3 S3 upload errors.
     """
@@ -80,6 +81,13 @@ def run_ingestion_pipeline(
         query_params=query_params,
         delay_seconds=delay_seconds,
     )
+
+    # The key of a re-run is the same, so an empty payload would replace good data.
+    if not raw_data["response"] and not endpoint_config.get("allow_empty", False):
+        raise ValueError(
+            f"Empty API response for endpoint '{endpoint}' with params "
+            f"{query_params}. Nothing was written to S3."
+        )
 
     try:
         envelope = DataEnvelope(
