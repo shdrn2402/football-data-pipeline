@@ -26,6 +26,13 @@ htmlcov/
 .idea/
 .ipynb_checkpoints/
 notebooks/
+.ruff_cache/
+
+# AI Agents (local artifacts)
+.antigravitycli/
+.gemini/
+architecture-analysis/
+.claude/settings.local.json
 
 # Data & Logs
 *.csv
@@ -73,7 +80,8 @@ orchestration/airflow/logs/
 .terraform/
 *tfvars
 *.tfstate
-*.tfstate.backup
+*.tfstate.*
+tfplan
 
 # OS
 .DS_Store
