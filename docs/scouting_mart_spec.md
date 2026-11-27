@@ -9,7 +9,7 @@ The platform solves two tasks in two stages:
 | Stage | Task | Data |
 |---|---|---|
 | v1 | Find talented players by on-pitch efficiency, discipline and availability | API-Football |
-| v2 | Find undervalued players and backtest whether high efficiency leads to market value growth | API-Football and an external market value source (to be chosen) |
+| v2 | Find undervalued players and backtest whether high efficiency leads to market value growth | API-Football and market values from transfermarkt-datasets |
 
 Player statistics are the core. Match results are secondary context. Screening and backtesting use finished seasons. The ongoing season is loaded during the paid plan month to demonstrate work with live data.
 
@@ -146,9 +146,22 @@ A daily snapshot of the fixture list stays in S3, so changes can be replayed aft
 | Injuries per match | `/injuries` with `league` and `season` | No injury dates. Reasons include cards, suspensions and national team duty |
 | Absence periods | `/sidelined` with `player` or `players` | Not yet in `configs/config.yaml` |
 | Age and nationality | Player profile endpoint | To be chosen and verified |
-| Market value | External source | v2 |
+| Market value | [transfermarkt-datasets](https://github.com/dcaribou/transfermarkt-datasets): `player_valuations` and `players` | v2, see below |
 
 Observed on the free plan on 2026-11-27: Eredivisie 2023 `/injuries` returned 1769 rows for 297 players in one request. `/sidelined` accepted five players in one request. Match events have no ID of their own, so the details of a match must be replaced as a whole.
+
+### Market value source
+
+Checked on 2026-11-27 on files dated 2026-09-05. `player_valuations` holds 656301 rows (player, date, value in EUR, club) from 2000-01-20 to 2026-06-12, with no duplicate player and date. `players` holds date of birth, citizenship and position. `clubs` is not needed.
+
+| Finding | Rule or consequence |
+|---|---|
+| EFL Championship has no competition code and no clubs in `clubs`. Valuations of its clubs carry other codes or none | Join by player and take the league from API-Football. Measure the coverage of Championship players |
+| Fewer players are valued in recent years: 27890 in 2023, 19628 in 2024, 18951 in 2025 | Some players have no next season value, possibly not at random. Report the share in the backtest |
+| Valuations cluster in June and December | Cut off at the end of June and limit the age of a valuation |
+| `players` holds current and highest values | Never use them as features. Take values only from `player_valuations` |
+| Date of birth is filled for 5002 of 5004 players seen in the Dutch, Portuguese and Belgian competition codes since July 2022. Only 2 rows of the file share name and date of birth | Match players by full name and date of birth from API-Football profiles, since match details give short names |
+| The dataset repository declares CC0, the data comes from Transfermarkt, whose terms were not checked. The download link was not confirmed from the maintainer | Check both before use. Do not commit the files |
 
 ## 7. Open questions
 
@@ -167,5 +180,5 @@ To decide:
 - How many days of finished matches an ongoing season downloads again
 - Position weights of the efficiency index
 - `availability_rate` for a player with several clubs
-- Market value source, its terms of use and the way players are matched to it
+- Terms of use of the market value data and the maximum age of a valuation
 - Seasons to load
