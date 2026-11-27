@@ -37,6 +37,7 @@ ELT pipeline: API-Sports (API-Football v3) → S3 landing zone (raw JSON) → Cl
 
 **Ingestion (`football-pipeline`)** — `cli.py` → `services/ingestion.py` → `extractors/football_api.py` (pagination, rate-limit sleep) → `domain/schemas.py` → `storage/s3.py`.
 - Endpoints are data-driven by `configs/config.yaml`: each entry has `path`, `allowed_params` (whitelist of query params actually sent) and `s3_template` (S3 key layout). Adding an endpoint means adding a config entry and a `click.Choice` value in `cli.py`.
+- An empty API response fails the run before the upload, unless the endpoint sets `allow_empty: true`.
 - `ingestion.py` builds a superset of args, then filters by `allowed_params`. E.g. `fixtures` does not allow `date`, so it always fetches the whole season.
 - Every S3 object is a `DataEnvelope`: `{"_metadata": {ingested_at, source, endpoint, params, target_date}, "payload": <raw API response>}`, written to `<s3_template>/data.json`.
 - `date=` in S3 paths is the **snapshot (extraction) date**, not the match date; all snapshots are kept.

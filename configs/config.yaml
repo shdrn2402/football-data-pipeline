@@ -1,5 +1,7 @@
 api:
   base_url: "https://v3.football.api-sports.io"
+  # An empty API response fails the run, so it cannot overwrite a stored object.
+  # Set allow_empty for endpoints where no data is a valid answer.
   endpoints:
     # Dimensions (Bootstrap)
     leagues:
@@ -37,6 +39,7 @@ api:
       path: "/fixtures/headtohead"
       allowed_params: ["h2h", "date", "league", "season", "last", "next", "from", "to", "status"]
       s3_template: "raw/facts/fixtures_head_to_head/h2h={h2h}/date={target_date}"
+      allow_empty: true
 
     fixtures_statistics:
       path: "/fixtures/statistics"
@@ -72,11 +75,13 @@ api:
       path: "/injuries"
       allowed_params: ["league", "season", "fixture", "team", "player", "date", "timezone"]
       s3_template: "raw/facts/injuries/league_id={league}/season={season}/date={target_date}"
+      allow_empty: true
 
     transfers:
       path: "/transfers"
       allowed_params: ["team", "player"]
       s3_template: "raw/facts/transfers/team_id={team}/date={target_date}"
+      allow_empty: true
 
   headers:
     key_name: "x-apisports-key"
