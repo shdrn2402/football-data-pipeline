@@ -39,17 +39,17 @@ from football_pipeline.services.ingestion import run_ingestion_pipeline
 )
 @click.option(
     "--league-id",
-    default=39,
+    default=None,
     type=int,
     envvar="INGEST_LEAGUE_ID",
-    help="Specify the league ID for which to ingest data. Default is 39.",
+    help="Specify the league ID for which to ingest data.",
 )
 @click.option(
     "--season",
-    default=2024,
+    default=None,
     type=int,
     envvar="INGEST_SEASON",
-    help="Specify the season year (format YYYY) for which to ingest data. Default is 2024.",
+    help="Specify the season start year (format YYYY) for which to ingest data.",
 )
 @click.option(
     "--team-id",
@@ -88,8 +88,8 @@ from football_pipeline.services.ingestion import run_ingestion_pipeline
 )
 def cli(
     endpoint: str,
-    league_id: int,
-    season: int,
+    league_id: int | None,
+    season: int | None,
     team_id: int | None,
     h2h: str | None,
     fixture_id: int | None,

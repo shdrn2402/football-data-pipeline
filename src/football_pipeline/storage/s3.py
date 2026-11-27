@@ -9,6 +9,8 @@ logger = logging.getLogger(__name__)
 # Query parameters that narrow a response, mapped to their S3 partition names.
 # "id" selects a player on /players; elsewhere it is part of the template.
 FILTER_PARTITIONS = {
+    "league": "league_id",
+    "season": "season",
     "team": "team_id",
     "player": "player_id",
     "id": "player_id",
