@@ -79,3 +79,35 @@ def upload_to_s3(data: str | dict, bucket: str, s3_key: str) -> None:
             f"Parameter validation error during S3 upload to bucket '{bucket}' at '{s3_key}': {e}"
         )
         raise
+
+
+def read_json_from_s3(bucket: str, s3_key: str) -> dict:
+    """Reads a JSON object from an AWS S3 bucket.
+
+    Raises:
+        botocore.exceptions.ClientError: If the object cannot be read.
+    """
+    try:
+        response = boto3.client("s3").get_object(Bucket=bucket, Key=s3_key)
+    except botocore.exceptions.ClientError as e:
+        logger.error(f"Failed to read S3 bucket '{bucket}' at '{s3_key}': {e}")
+        raise
+    return json.loads(response["Body"].read())
+
+
+def list_s3_keys(bucket: str, prefix: str) -> set[str]:
+    """Returns all object keys under a prefix.
+
+    Raises:
+        botocore.exceptions.ClientError: If listing is not allowed or fails.
+    """
+    pages = (
+        boto3.client("s3")
+        .get_paginator("list_objects_v2")
+        .paginate(Bucket=bucket, Prefix=prefix)
+    )
+    try:
+        return {item["Key"] for page in pages for item in page.get("Contents", [])}
+    except botocore.exceptions.ClientError as e:
+        logger.error(f"Failed to list S3 bucket '{bucket}' at '{prefix}': {e}")
+        raise

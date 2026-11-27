@@ -61,6 +61,17 @@ api:
       allowed_params: ["fixture", "team"]
       s3_template: "raw/facts/fixtures_players/fixture_id={fixture}"
 
+    # Details of finished matches: events, lineups, team and player statistics.
+    # Reads a fixtures snapshot, skips stored matches and writes one object per match.
+    match_details:
+      path: "/fixtures"
+      s3_template: "raw/facts/match_details/fixture_id={fixture}"
+      # 1 sends "id" (free plan). 2 to 20 sends "ids" (paid plan).
+      batch_size: 1
+      # Protects the daily quota. Override with --max-fixtures.
+      max_fixtures_per_run: 10
+      finished_statuses: ["FT", "AET", "PEN"]
+
     players_statistics:
       path: "/players"
       allowed_params: ["id", "team", "league", "season"]

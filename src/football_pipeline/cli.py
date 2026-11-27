@@ -5,6 +5,10 @@ import click
 from football_pipeline.core.config import load_config
 from football_pipeline.core.logger import setup_logger
 from football_pipeline.services.ingestion import run_ingestion_pipeline
+from football_pipeline.services.match_details import (
+    ENDPOINT as MATCH_DETAILS,
+)
+from football_pipeline.services.match_details import run_match_details_pipeline
 
 
 @click.command()
@@ -59,6 +63,13 @@ from football_pipeline.services.ingestion import run_ingestion_pipeline
     help="Specify the player ID to filter data for a specific player.",
 )
 @click.option(
+    "--max-fixtures",
+    default=None,
+    type=click.IntRange(min=1),
+    envvar="INGEST_MAX_FIXTURES",
+    help="match_details only: matches to download in this run. Default is from config.yaml.",
+)
+@click.option(
     "--target-date",
     default=datetime.now(UTC).strftime("%Y-%m-%d"),
     type=str,
@@ -73,6 +84,7 @@ def cli(
     h2h: str | None,
     fixture_id: int | None,
     player_id: int | None,
+    max_fixtures: int | None,
     target_date: str,
 ) -> None:
     """Entry point for the data ingestion pipeline."""
@@ -86,6 +98,17 @@ def cli(
             f"'{endpoint}' is not one of: {', '.join(endpoints)}.",
             param_hint="'--endpoint'",
         )
+
+    if endpoint == MATCH_DETAILS:
+        run_match_details_pipeline(
+            config=config,
+            target_date=target_date,
+            league_id=league_id,
+            season=season,
+            fixture_id=fixture_id,
+            max_fixtures=max_fixtures,
+        )
+        return
 
     run_ingestion_pipeline(
         endpoint=endpoint,

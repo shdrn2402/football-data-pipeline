@@ -18,6 +18,11 @@ def run_cli(monkeypatch, args):
     monkeypatch.setattr(
         cli, "run_ingestion_pipeline", lambda **kwargs: calls.append(kwargs)
     )
+    monkeypatch.setattr(
+        cli,
+        "run_match_details_pipeline",
+        lambda **kwargs: calls.append({"endpoint": "match_details", **kwargs}),
+    )
     return CliRunner().invoke(cli.cli, args), calls
 
 
@@ -51,4 +56,5 @@ def test_config_declares_only_parameters_the_pipeline_can_send():
     }
 
     for name, endpoint in CONFIG["api"]["endpoints"].items():
-        assert set(endpoint["allowed_params"]) <= supported, name
+        # match_details builds its own "id" or "ids" parameter.
+        assert set(endpoint.get("allowed_params", [])) <= supported, name
