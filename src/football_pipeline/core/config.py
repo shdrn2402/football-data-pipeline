@@ -12,6 +12,8 @@ def load_config(config_path: str | Path, env_path: str | Path) -> dict:
     """
     Loads YAML configuration and injects required environment variables.
 
+    The optional API_DELAY_SECONDS variable overrides api.limits.delay_seconds.
+
     Reads the static configuration from the specified YAML file and
     supplements it with dynamic secrets loaded from the environment
     or a provided .env file.
@@ -37,6 +39,9 @@ def load_config(config_path: str | Path, env_path: str | Path) -> dict:
         config = yaml.safe_load(config_path.read_text())
         config["api_football_key"] = os.environ["API_FOOTBALL_KEY"]
         config["aws_s3_landing_bucket"] = os.environ["AWS_S3_LANDING_BUCKET_NAME"]
+        # An empty value means "not set": orchestrators pass it unconditionally.
+        if delay_override := os.environ.get("API_DELAY_SECONDS"):
+            config["api"]["limits"]["delay_seconds"] = float(delay_override)
     except FileNotFoundError as e:
         logger.error(f"Configuration file not found: {e}")
         raise

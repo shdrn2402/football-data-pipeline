@@ -39,6 +39,7 @@ ELT pipeline: API-Sports (API-Football v3) → S3 landing zone (raw JSON) → Cl
 - Endpoints are data-driven by `configs/config.yaml`: each entry has `path`, `allowed_params` (whitelist of query params actually sent) and `s3_template` (S3 key layout). The CLI takes the endpoint names from the config, so adding an endpoint means adding a config entry. `allowed_params` may only list parameters that `ingestion.py` can build (covered by a test).
 - `date=target_date` is sent to the API only where it matches snapshot semantics (`teams_statistics`). The CLI has no default league or season.
 - Filters (`league`, `season`, `team`, `player`, `fixture`) missing from `s3_template` are added to the S3 key (`add_filter_partitions`), so a filtered run never overwrites a full snapshot. A missing template value fails before the API call.
+- `request_page` retries network errors, 429, 5xx and `errors.rateLimit` with backoff, but not when the daily quota is exhausted. Limits are in `api.limits`; `API_DELAY_SECONDS` overrides the request pause (Airflow variable `api_delay_seconds`).
 - An empty API response fails the run before the upload, unless the endpoint sets `allow_empty: true`.
 - `ingestion.py` builds a superset of args, then filters by `allowed_params`. E.g. `fixtures` does not allow `date`, so it always fetches the whole season.
 - Every S3 object is a `DataEnvelope`: `{"_metadata": {ingested_at, source, endpoint, params, target_date}, "payload": <raw API response>}`, written to `<s3_template>/data.json`.

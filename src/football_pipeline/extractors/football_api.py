@@ -6,12 +6,65 @@ import requests
 logger = logging.getLogger(__name__)
 
 
+def is_daily_quota_exhausted(response: requests.Response) -> bool:
+    """Tells whether retrying today is pointless."""
+    return response.headers.get("x-ratelimit-requests-remaining") == "0"
+
+
+def request_page(
+    url: str,
+    headers: dict,
+    params: dict,
+    timeout: tuple,
+    max_retries: int,
+    retry_delay_seconds: int,
+) -> dict:
+    """Requests one page, retrying temporary failures with exponential backoff.
+
+    Network errors, HTTP 429 and 5xx, and the per-minute limit reported in the
+    response body are temporary, unless the daily quota is exhausted.
+    """
+    for attempt in range(max_retries + 1):
+        is_last_attempt = attempt == max_retries
+        try:
+            response = requests.get(
+                url, headers=headers, params=params, timeout=timeout
+            )
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+            if is_last_attempt:
+                raise
+            reason = str(e)
+        else:
+            can_retry = not is_last_attempt and not is_daily_quota_exhausted(response)
+            if response.status_code == 429 or response.status_code >= 500:
+                if not can_retry:
+                    response.raise_for_status()
+                reason = f"HTTP {response.status_code}"
+            else:
+                response.raise_for_status()
+                data = response.json()
+                errors = data.get("errors")
+                is_rate_limited = isinstance(errors, dict) and "rateLimit" in errors
+                if not (is_rate_limited and can_retry):
+                    return data
+                reason = errors["rateLimit"]
+
+        wait_seconds = retry_delay_seconds * 2**attempt
+        logger.warning(
+            f"Temporary failure: {reason}. Retry {attempt + 1}/{max_retries} "
+            f"in {wait_seconds} s."
+        )
+        time.sleep(wait_seconds)
+
+
 def fetch_data(
     url: str,
     headers: dict,
     timeout: tuple,
     query_params: dict | None = None,
-    delay_seconds: int = 0,
+    delay_seconds: float = 0,
+    max_retries: int = 0,
+    retry_delay_seconds: int = 0,
 ) -> dict:
     """Executes GET requests to the API, automatically handling pagination
     and rate limiting across multiple pages.
@@ -21,7 +74,9 @@ def fetch_data(
         headers (dict): Request headers containing authentication tokens.
         timeout (tuple): Connection and read timeouts (connect, read).
         query_params (dict | None, optional): Query string parameters. Defaults to None.
-        delay_seconds (int, optional): Sleep time between paginated requests to respect rate limits. Defaults to 0.
+        delay_seconds (float, optional): Sleep time between paginated requests to respect rate limits. Defaults to 0.
+        max_retries (int, optional): Retries per page for temporary failures. Defaults to 0.
+        retry_delay_seconds (int, optional): Wait before the first retry, doubled on each next one. Defaults to 0.
 
     Raises:
         requests.exceptions.HTTPError: If the HTTP request returns an unsuccessful status code.
@@ -45,11 +100,9 @@ def fetch_data(
         logger.info(f"Fetching page {current_page}/{total_pages} from {url}...")
 
         try:
-            response = requests.get(
-                url, headers=headers, params=params, timeout=timeout
+            data = request_page(
+                url, headers, params, timeout, max_retries, retry_delay_seconds
             )
-            response.raise_for_status()
-            data = response.json()
 
             # Plan limitations arrive here too (HTTP 200, empty response). They
             # must fail the run: a partial result would be stored as a complete one.
