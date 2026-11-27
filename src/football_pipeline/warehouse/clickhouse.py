@@ -4,6 +4,9 @@ from pathlib import Path
 
 import requests
 
+from football_pipeline.core.config import read_config
+from football_pipeline.storage.s3 import add_filter_partitions, build_s3_key
+
 logger = logging.getLogger(__name__)
 
 SQL_DIR = Path(__file__).parent / "sql"
@@ -56,13 +59,20 @@ def run_sql_file(file_name: str, params: dict | None = None) -> None:
 
 
 def build_fixtures_s3_url(league_id: int, season: int, target_date: str) -> str:
-    """Builds the URL of one fixtures snapshot written by the ingestion step."""
+    """Builds the URL of one fixtures snapshot written by the ingestion step.
+
+    The object key comes from the same s3_template that ingestion writes with.
+    """
+    template = read_config()["api"]["endpoints"]["fixtures"]["s3_template"]
+    filters = {"league": league_id, "season": season}
+    s3_key = build_s3_key(
+        add_filter_partitions(template, filters),
+        target_date=target_date,
+        **filters,
+    )
     bucket = os.environ["AWS_S3_LANDING_BUCKET_NAME"]
     region = os.environ.get("AWS_DEFAULT_REGION", "eu-central-1")
-    return (
-        f"https://{bucket}.s3.{region}.amazonaws.com/raw/facts/fixtures/"
-        f"league_id={league_id}/season={season}/date={target_date}/data.json"
-    )
+    return f"https://{bucket}.s3.{region}.amazonaws.com/{s3_key}"
 
 
 def escape_sql_string(value: str) -> str:

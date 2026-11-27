@@ -1,18 +1,42 @@
 import pytest
+import yaml
 
+from football_pipeline.core.config import DEFAULT_CONFIG_PATH, read_config
+from football_pipeline.services import ingestion
 from football_pipeline.warehouse import clickhouse
 
 
-def test_build_fixtures_s3_url_matches_ingestion_key(monkeypatch):
+@pytest.mark.parametrize(
+    "template",
+    [
+        None,  # the template of the real config
+        "another/layout/{league}/{season}/date={target_date}",
+        # Ingestion appends a filter the template lacks, so the URL must too.
+        "raw/facts/fixtures/league_id={league}/date={target_date}",
+    ],
+)
+def test_build_fixtures_s3_url_matches_ingestion_key(monkeypatch, tmp_path, template):
+    config = read_config(DEFAULT_CONFIG_PATH)
+    if template:
+        config["api"]["endpoints"]["fixtures"]["s3_template"] = template
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+    monkeypatch.setenv("PIPELINE_CONFIG_PATH", str(config_path))
     monkeypatch.setenv("AWS_S3_LANDING_BUCKET_NAME", "test-bucket")
     monkeypatch.setenv("AWS_DEFAULT_REGION", "eu-central-1")
+    uploaded = []
+    monkeypatch.setattr(ingestion, "fetch_data", lambda **kwargs: {"response": [{}]})
+    monkeypatch.setattr(
+        ingestion, "upload_to_s3", lambda data, bucket, key: uploaded.append(key)
+    )
+    config.update(api_football_key="test-key", aws_s3_landing_bucket="test-bucket")
 
+    ingestion.run_ingestion_pipeline(
+        "fixtures", "2026-11-07", config, league_id=39, season=2023
+    )
     url = clickhouse.build_fixtures_s3_url(39, 2023, "2026-11-07")
 
-    assert url == (
-        "https://test-bucket.s3.eu-central-1.amazonaws.com/raw/facts/fixtures/"
-        "league_id=39/season=2023/date=2026-11-07/data.json"
-    )
+    assert url == f"https://test-bucket.s3.eu-central-1.amazonaws.com/{uploaded[0]}"
 
 
 def test_read_statements_splits_create_tables():
